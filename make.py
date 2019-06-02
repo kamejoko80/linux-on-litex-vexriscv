@@ -153,6 +153,18 @@ class De0Nano(Board):
         prog = USBBlaster()
         prog.load_bitstream("build/de0nano/gateware/top.sof")
 
+# QmaTech support ------------------------------------------------------------------------------------
+
+class QmaTech(Board):
+    def __init__(self):
+        from litex.boards.targets import qmatech
+        Board.__init__(self, qmatech.BaseSoC, "serial")
+
+    def load(self):
+        from litex.build.altera import USBBlaster
+        prog = USBBlaster()
+        prog.load_bitstream("build/qmatech/gateware/top.sof")
+
 # Main ---------------------------------------------------------------------------------------------
 
 supported_boards = {
@@ -169,6 +181,8 @@ supported_boards = {
     "ulx3s":        ULX3S,
     # Altera/Intel
     "de0nano":      De0Nano,
+    # QMA/Tech
+    "qmatech":      QmaTech,
 }
 
 def main():
