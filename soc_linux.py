@@ -9,6 +9,8 @@ from litex.soc.integration.soc_core import mem_decoder
 
 from litex.soc.cores.spi_flash import SpiFlash
 
+from periphs.misc import *
+
 # SoCLinux -----------------------------------------------------------------------------------------
 
 def SoCLinux(soc_cls, **kwargs):
@@ -33,11 +35,16 @@ def SoCLinux(soc_cls, **kwargs):
         }
 
         def __init__(self, **kwargs):
-            soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="standard", **kwargs)
+            soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="lite", **kwargs)
 
             # machine mode emulator ram
             self.submodules.emulator_ram = wishbone.SRAM(0x4000)
             self.register_mem("emulator_ram", self.mem_map["emulator_ram"], self.emulator_ram.bus, 0x4000)
+
+            # Integrate int module
+            self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
+            self.add_csr("gpio_isr", 10, allow_user_defined=True)
+            self.add_interrupt("gpio_isr", 2, allow_user_defined=True)
 
         def add_spi_flash(self):
             # FIXME: only support 7-series for now
