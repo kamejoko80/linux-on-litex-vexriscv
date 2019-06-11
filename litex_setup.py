@@ -36,6 +36,7 @@ if "init" in sys.argv[1:]:
         # clone repo (recursive if needed)
         print("[cloning " + name + "]...")
         full_url = url + name
+        opts = "--recursive" if need_recursive else ""
         branch = "-b custom" if name in ["litex"] else ""
         os.system("git clone " + full_url + " " + opts + " " + branch)
 
