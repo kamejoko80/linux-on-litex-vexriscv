@@ -21,3 +21,18 @@ class GpioISR(Module, AutoCSR):
             self.ev.gpio_falling_int = EventSourceProcess()
             self.ev.finalize()
             self.comb += self.ev.gpio_falling_int.trigger.eq(pad)
+            
+# GPIO interrupt
+class Adder8(Module, AutoCSR):
+  def __init__(self):
+        self.op1 = CSRStorage(8)
+        self.op2 = CSRStorage(8)
+        self.sum = CSRStatus(8)
+        self.ena = CSRStorage(1, reset = 0)
+       
+        self.sync += [
+            # trig and done work as mono stable circuitry            
+            If(self.ena.storage == 1,
+                self.sum.status.eq(self.op1.storage + self.op2.storage),
+            )
+        ] 

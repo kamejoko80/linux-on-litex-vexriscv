@@ -41,5 +41,9 @@ def SoCVexRiscv(soc_cls, **kwargs):
             self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
             self.add_csr("gpio_isr", 10, allow_user_defined=True)
             self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
+            
+            # Integrate Adder8
+            self.submodules.adder8 = Adder8()
+            self.add_csr("adder8", 11, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
