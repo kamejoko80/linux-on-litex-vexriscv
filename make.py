@@ -7,6 +7,7 @@ from litex.soc.integration.builder import Builder
 
 from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
+from soc_vexriscv import SoCVexRiscv
 
 # Board definition----------------------------------------------------------------------------------
 
@@ -210,15 +211,9 @@ def main():
         if board_name in ["versa_ecp5", "ulx3s"]:
             soc_kwargs["toolchain"] = "trellis"
         if board_name in ["qmatech"]:
-            soc = SoCPicorv32(board.soc_cls, **soc_kwargs)
+            soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
         else:   
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
-        if "spiflash" in board.soc_capabilities:
-            soc.add_spi_flash()
-        if "ethernet" in board.soc_capabilities:
-            soc.configure_ethernet(local_ip=args.local_ip, remote_ip=args.remote_ip)
-        soc.configure_boot()
-        soc.compile_device_tree(board_name)
 
         if args.build:
             builder = Builder(soc, output_dir="build/" + board_name)

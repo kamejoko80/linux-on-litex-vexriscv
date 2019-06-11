@@ -11,9 +11,9 @@ from litex.soc.cores.spi_flash import SpiFlash
 
 from periphs.misc import *
 
-# SoCPicorv32 -----------------------------------------------------------------------------------------
+# SoCVexRiscv -----------------------------------------------------------------------------------------
 
-def SoCPicorv32(soc_cls, **kwargs):
+def SoCVexRiscv(soc_cls, **kwargs):
     class _SoCLinux(soc_cls):
         soc_cls.csr_map.update({
             "ctrl":       0,
@@ -35,7 +35,7 @@ def SoCPicorv32(soc_cls, **kwargs):
         }
 
         def __init__(self, **kwargs):
-            soc_cls.__init__(self, cpu_type="picorv32", cpu_variant="minimal", **kwargs)
+            soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="standard", **kwargs)
 
             # Integrate int module
             self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
