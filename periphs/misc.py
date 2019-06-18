@@ -21,7 +21,7 @@ class GpioISR(Module, AutoCSR):
             self.ev.gpio_falling_int = EventSourceProcess()
             self.ev.finalize()
             self.comb += self.ev.gpio_falling_int.trigger.eq(pad)
- 
+
 # Simple Adder8 module
 class Adder8(Module, AutoCSR):
   def __init__(self):
@@ -35,3 +35,24 @@ class Adder8(Module, AutoCSR):
                 self.sum.status.eq(self.op1.storage + self.op2.storage),
             )
         ] 
+
+# Simple Uart module
+class MyUart(Module, AutoCSR):
+   def __init__(self, txd, led):
+        self.tx_dat = CSRStorage(8)
+        self.tx_ena = CSRStorage(1, reset = 0)
+        self.tx_bsy = CSRStatus(1)
+
+        tx_status = Signal()
+
+        self.comb += self.tx_bsy.status.eq(tx_status)
+
+        self.specials += [
+            Instance("my_uart",
+                    i_din=self.tx_dat.storage,
+                    i_wr_en=self.tx_ena.storage,
+                    i_clk_in=ClockSignal(),
+                    o_tx=txd,
+                    o_tx_busy=tx_status,
+                    )
+        ]

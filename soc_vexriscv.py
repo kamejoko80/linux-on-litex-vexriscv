@@ -46,4 +46,9 @@ def SoCVexRiscv(soc_cls, **kwargs):
             self.submodules.adder8 = Adder8()
             self.add_csr("adder8", 11, allow_user_defined=True)
 
+            # Integrate my uart
+            self.platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
+            self.submodules.my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
+            self.add_csr("my_uart", 12, allow_user_defined=True)            
+            
     return _SoCLinux(**kwargs)
