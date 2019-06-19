@@ -51,4 +51,20 @@ def SoCVexRiscv(soc_cls, **kwargs):
             self.submodules.my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
             self.add_csr("my_uart", 12, allow_user_defined=True)            
             
+            # Integrate CAN
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_top.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_acf.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_btl.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_defines.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_ibo.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_syn.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_bsp.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_crc.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_fifo.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn_syn.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_registers.v"))
+            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
+            self.submodules.can_controller = CanController()
+            
     return _SoCLinux(**kwargs)

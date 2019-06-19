@@ -9,7 +9,7 @@ from litex.soc.interconnect.csr_eventmanager import *
 
 # GPIO interrupt
 class GpioISR(Module, AutoCSR):
-  def __init__(self, pad, rissing_edge_detect = False):
+    def __init__(self, pad, rissing_edge_detect = False):
         # Add int to module
         self.submodules.ev = EventManager()
 
@@ -24,7 +24,7 @@ class GpioISR(Module, AutoCSR):
 
 # Simple Adder8 module
 class Adder8(Module, AutoCSR):
-  def __init__(self):
+    def __init__(self):
         self.op1 = CSRStorage(8)
         self.op2 = CSRStorage(8)
         self.sum = CSRStatus(8)
@@ -38,7 +38,7 @@ class Adder8(Module, AutoCSR):
 
 # Simple Uart module
 class MyUart(Module, AutoCSR):
-   def __init__(self, txd, led):
+    def __init__(self, txd, led):
         self.tx_dat = CSRStorage(8)
         self.tx_ena = CSRStorage(1, reset = 0)
         self.tx_bsy = CSRStatus(1)
@@ -56,3 +56,31 @@ class MyUart(Module, AutoCSR):
                     o_tx_busy=tx_status,
                     )
         ]
+
+# CanController module
+class CanController(Module):
+    def __init__(self):
+             
+        port_0_io = Signal(7)
+        tx_o = Signal()        
+        irq_on = Signal()
+        clkout_o = Signal()
+        bus_off_on = Signal()
+        
+        self.specials += [
+            Instance("can_top",
+                    i_rst_i=0,
+                    i_ale_i=0,
+                    i_rd_i=0,
+                    i_wr_i=0,
+                    io_port_0_io=port_0_io,
+                    i_cs_can_i=0,
+                    i_clk_i=ClockSignal(),
+                    i_rx_i=0,
+                    o_tx_o=tx_o,
+                    o_bus_off_on=bus_off_on,
+                    o_irq_on=irq_on,
+                    o_clkout_o=clkout_o,
+                    )
+        ]        
+        
