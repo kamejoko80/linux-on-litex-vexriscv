@@ -32,6 +32,7 @@ def SoCVexRiscv(soc_cls, **kwargs):
             "spiflash":     0x50000000,
             "main_ram":     0xc0000000,
             "csr":          0xf0000000,
+            "can_ctrl":     0xff000000,
         }
 
         def __init__(self, **kwargs):
@@ -41,30 +42,20 @@ def SoCVexRiscv(soc_cls, **kwargs):
             self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
             self.add_csr("gpio_isr", 10, allow_user_defined=True)
             self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
-            
+
             # Integrate Adder8
             self.submodules.adder8 = Adder8()
             self.add_csr("adder8", 11, allow_user_defined=True)
 
             # Integrate my uart
-            self.platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
-            self.submodules.my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
-            self.add_csr("my_uart", 12, allow_user_defined=True)            
-            
+            self.submodules.my_uart = my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
+            my_uart.add_source(self.platform)
+            self.add_csr("my_uart", 12, allow_user_defined=True)
+
             # Integrate CAN
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_top.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_acf.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_btl.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_defines.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_ibo.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_syn.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_bsp.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_crc.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_fifo.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn_syn.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_registers.v"))
-            self.platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
-            self.submodules.can_controller = CanController()
-            
+            self.submodules.can_controller = can_controller = CanController()
+            self.add_wb_slave(mem_decoder(soc_cls.mem_map["can_ctrl"]), can_controller.bus)
+            self.add_memory_region("can_ctrl", soc_cls.mem_map["can_ctrl"], 1000)
+            can_controller.add_source(self.platform)
+
     return _SoCLinux(**kwargs)

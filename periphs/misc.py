@@ -57,30 +57,80 @@ class MyUart(Module, AutoCSR):
                     )
         ]
 
+    def add_source(self, platform):
+            platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
+
+
 # CanController module
 class CanController(Module):
     def __init__(self):
-             
-        port_0_io = Signal(7)
-        tx_o = Signal()        
-        irq_on = Signal()
-        clkout_o = Signal()
+
+        # wishbobe bus 
+        self.bus = bus = wishbone.Interface()
+
+        # wishbone interface 
+        wb_clk_i   = Signal()
+        wb_rst_i   = Signal()
+        wb_dat_i   = Signal(8)
+        wb_dat_o   = Signal(8)
+        wb_cyc_i   = Signal()
+        wb_stb_i   = Signal()
+        wb_we_i    = Signal()
+        wb_adr_i   = Signal(8)
+        wb_ack_o   = Signal()
+
+        # misc signals
+        rx_i       = Signal()
+        tx_o       = Signal()
         bus_off_on = Signal()
-        
+        irq_on     = Signal()
+        clkout_o   = Signal()
+
+        self.comb += [
+            wb_clk_i.eq(ClockSignal()),
+            wb_rst_i.eq(1),
+            wb_dat_i.eq(bus.dat_w),
+            bus.dat_r.eq(wb_dat_o),
+            wb_cyc_i.eq(bus.cyc),
+            wb_stb_i.eq(bus.stb),
+            wb_we_i.eq(bus.we),
+            wb_adr_i.eq(bus.adr),
+            bus.ack.eq(wb_ack_o),
+        ]
+
         self.specials += [
             Instance("can_top",
-                    i_rst_i=0,
-                    i_ale_i=0,
-                    i_rd_i=0,
-                    i_wr_i=0,
-                    io_port_0_io=port_0_io,
-                    i_cs_can_i=0,
-                    i_clk_i=ClockSignal(),
-                    i_rx_i=0,
-                    o_tx_o=tx_o,
-                    o_bus_off_on=bus_off_on,
-                    o_irq_on=irq_on,
-                    o_clkout_o=clkout_o,
+                    # WB IF
+                    i_wb_clk_i   = wb_clk_i,
+                    i_wb_rst_i   = wb_rst_i,
+                    i_wb_dat_i   = wb_dat_i,
+                    o_wb_dat_o   = wb_dat_o,
+                    i_wb_cyc_i   = wb_cyc_i,
+                    i_wb_stb_i   = wb_stb_i,
+                    i_wb_we_i    = wb_we_i, 
+                    i_wb_adr_i   = wb_adr_i,
+                    o_wb_ack_o   = wb_ack_o,
+                    # MISC
+                    i_clk_i      = ClockSignal(),
+                    i_rx_i       = rx_i,
+                    o_tx_o       = tx_o,
+                    o_bus_off_on = bus_off_on,
+                    o_irq_on     = irq_on,
+                    o_clkout_o   = clkout_o,
                     )
-        ]        
-        
+        ]
+
+    def add_source(self, platform):
+            platform.add_source(os.path.join("periphs/verilog/can", "can_top.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_acf.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_btl.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_defines.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_ibo.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_register_syn.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_bsp.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_crc.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_fifo.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn_syn.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_registers.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
