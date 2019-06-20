@@ -60,6 +60,24 @@ class MyUart(Module, AutoCSR):
     def add_source(self, platform):
             platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
 
+# Simple wishbone gpio module            
+class WbGpio(Module):
+    def __init__(self, led):
+        self.bus = bus = wishbone.Interface()
+        led_wire = Signal(1, reset=1)
+
+        self.comb += led.eq(led_wire)
+
+        # run mw addr 0/1 1 to turn on/off the led
+        self.sync += [
+            bus.ack.eq(0),
+            If(bus.cyc & bus.stb & ~bus.ack,
+                bus.ack.eq(1),
+                If(bus.we,
+                    led_wire.eq(bus.dat_w[0])
+                )
+            )
+        ]
 
 # CanController module
 class CanController(Module):
@@ -88,7 +106,7 @@ class CanController(Module):
 
         self.comb += [
             wb_clk_i.eq(ClockSignal()),
-            wb_rst_i.eq(1),
+            wb_rst_i.eq(ResetSignal()),
             wb_dat_i.eq(bus.dat_w),
             bus.dat_r.eq(wb_dat_o),
             wb_cyc_i.eq(bus.cyc),
