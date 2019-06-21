@@ -56,7 +56,7 @@ def SoCVexRiscv(soc_cls, **kwargs):
             #self.register_mem("wb_gpio", 0x30000000, wb_gpio.bus, 1000)
 
             # Integrate CAN
-            self.submodules.can_controller = can_controller = CanController()
+            self.submodules.can_controller = can_controller = SJA1000(self.platform.request("canif", 0))
             self.register_mem("can_ctrl", 0x30000000, can_controller.bus, 1000)
             can_controller.add_source(self.platform)
 

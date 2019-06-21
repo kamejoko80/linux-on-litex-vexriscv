@@ -79,9 +79,9 @@ class WbGpio(Module):
             )
         ]
 
-# CanController module
-class CanController(Module):
-    def __init__(self):
+# SJA1000 opencore can controller module
+class SJA1000(Module):
+    def __init__(self, canif):
 
         # wishbobe bus 
         self.bus = bus = wishbone.Interface()
@@ -105,6 +105,7 @@ class CanController(Module):
         clkout_o   = Signal()
 
         self.comb += [
+            # wishbone interface
             wb_clk_i.eq(ClockSignal()),
             wb_rst_i.eq(ResetSignal()),
             wb_dat_i.eq(bus.dat_w),
@@ -114,6 +115,13 @@ class CanController(Module):
             wb_we_i.eq(bus.we),
             wb_adr_i.eq(bus.adr),
             bus.ack.eq(wb_ack_o),
+
+            # misc signals
+            rx_i.eq(canif.rx),
+            tx_o.eq(canif.tx),
+            bus_off_on.eq(canif.boo),
+            irq_on.eq(canif.irq),
+            clkout_o.eq(canif.clkout)
         ]
 
         self.specials += [
