@@ -38,13 +38,13 @@ def SoCVexRiscv(soc_cls, **kwargs):
             soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="standard", **kwargs)
 
             # Integrate int module
-            self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
-            self.add_csr("gpio_isr", 10, allow_user_defined=True)
-            self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
+            #self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
+            #self.add_csr("gpio_isr", 10, allow_user_defined=True)
+            #self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
 
             # Integrate Adder8
-            self.submodules.adder8 = Adder8()
-            self.add_csr("adder8", 11, allow_user_defined=True)
+            #self.submodules.adder8 = Adder8()
+            #self.add_csr("adder8", 11, allow_user_defined=True)
 
             # Integrate my uart
             #self.submodules.my_uart = my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))

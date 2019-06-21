@@ -137,7 +137,7 @@ class SJA1000(Module):
                     i_wb_adr_i   = wb_adr_i,
                     o_wb_ack_o   = wb_ack_o,
                     # MISC
-                    i_clk_i      = ClockSignal(),
+                    i_clk_i      = ClockSignal("can"),
                     i_rx_i       = rx_i,
                     o_tx_o       = tx_o,
                     o_bus_off_on = bus_off_on,
