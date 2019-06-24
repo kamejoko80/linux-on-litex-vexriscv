@@ -83,66 +83,28 @@ class WbGpio(Module):
 class SJA1000(Module):
     def __init__(self, canif):
 
-        # wishbobe bus 
+        # wishbone bus 
         self.bus = bus = wishbone.Interface()
-
-        # wishbone interface 
-        wb_clk_i   = Signal()
-        wb_rst_i   = Signal()
-        wb_dat_i   = Signal(8)
-        wb_dat_o   = Signal(8)
-        wb_cyc_i   = Signal()
-        wb_stb_i   = Signal()
-        wb_we_i    = Signal()
-        wb_adr_i   = Signal(8)
-        wb_ack_o   = Signal()
-
-        # misc signals
-        rx_i       = Signal()
-        tx_o       = Signal()
-        bus_off_on = Signal()
-        irq_on     = Signal()
-        clkout_o   = Signal()
-
-        self.comb += [
-            # wishbone interface
-            wb_clk_i.eq(ClockSignal()),
-            wb_rst_i.eq(ResetSignal()),
-            wb_dat_i.eq(bus.dat_w),
-            bus.dat_r.eq(wb_dat_o),
-            wb_cyc_i.eq(bus.cyc),
-            wb_stb_i.eq(bus.stb),
-            wb_we_i.eq(bus.we),
-            wb_adr_i.eq(bus.adr),
-            bus.ack.eq(wb_ack_o),
-
-            # misc signals
-            rx_i.eq(canif.rx),
-            tx_o.eq(canif.tx),
-            bus_off_on.eq(canif.boo),
-            irq_on.eq(canif.irq),
-            clkout_o.eq(canif.clkout)
-        ]
 
         self.specials += [
             Instance("can_top",
                     # WB IF
-                    i_wb_clk_i   = wb_clk_i,
-                    i_wb_rst_i   = wb_rst_i,
-                    i_wb_dat_i   = wb_dat_i,
-                    o_wb_dat_o   = wb_dat_o,
-                    i_wb_cyc_i   = wb_cyc_i,
-                    i_wb_stb_i   = wb_stb_i,
-                    i_wb_we_i    = wb_we_i, 
-                    i_wb_adr_i   = wb_adr_i,
-                    o_wb_ack_o   = wb_ack_o,
+                    i_wb_clk_i   = ClockSignal(),
+                    i_wb_rst_i   = ResetSignal(),
+                    i_wb_dat_i   = bus.dat_w,
+                    o_wb_dat_o   = bus.dat_r,
+                    i_wb_cyc_i   = bus.cyc,
+                    i_wb_stb_i   = bus.stb,
+                    i_wb_we_i    = bus.we, 
+                    i_wb_adr_i   = bus.adr,
+                    o_wb_ack_o   = bus.ack,
                     # MISC
                     i_clk_i      = ClockSignal("can"),
-                    i_rx_i       = rx_i,
-                    o_tx_o       = tx_o,
-                    o_bus_off_on = bus_off_on,
-                    o_irq_on     = irq_on,
-                    o_clkout_o   = clkout_o,
+                    i_rx_i       = canif.rx,
+                    o_tx_o       = canif.tx,
+                    o_bus_off_on = canif.boo,
+                    o_irq_on     = canif.irq,
+                    o_clkout_o   = canif.clkout,
                     )
         ]
 
