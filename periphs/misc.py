@@ -99,7 +99,7 @@ class SJA1000(Module):
                     i_wb_adr_i   = bus.adr,
                     o_wb_ack_o   = bus.ack,
                     # MISC
-                    i_clk_i      = ClockSignal("can"),
+                    i_clk_i      = ClockSignal(),
                     i_rx_i       = canif.rx,
                     o_tx_o       = canif.tx,
                     o_bus_off_on = canif.boo,
