@@ -56,10 +56,10 @@ def SoCVexRiscv(soc_cls, **kwargs):
             # self.register_mem("wb_gpio", 0x30000000, wb_gpio.bus, 1000)
 
             # Integrate CAN
-            self.submodules.can_ctrl = can_ctrl = SJA1000(self.platform.request("canif", 0))
-            self.add_csr("can_ctrl", 13, allow_user_defined=True)
-            self.add_interrupt("can_ctrl", 6, allow_user_defined=True)
-            self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 1000)
-            can_ctrl.add_source(self.platform)
+            # self.submodules.can_ctrl = can_ctrl = SJA1000(self.platform.request("canif", 0))
+            # self.add_csr("can_ctrl", 13, allow_user_defined=True)
+            # self.add_interrupt("can_ctrl", 6, allow_user_defined=True)
+            # self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 1000)
+            # can_ctrl.add_source(self.platform)
 
     return _SoCLinux(**kwargs)
