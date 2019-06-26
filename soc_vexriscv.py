@@ -62,4 +62,9 @@ def SoCVexRiscv(soc_cls, **kwargs):
             # self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 1000)
             # can_ctrl.add_source(self.platform)
 
+            # Integrate wishbone to avalon bridge
+            self.submodules.w2a_bridge = w2a_bridge = W2ABridge()
+            self.register_mem("w2a_bridge", 0x30000000, w2a_bridge.bus, 1000)
+            w2a_bridge.add_source(self.platform)            
+            
     return _SoCLinux(**kwargs)
