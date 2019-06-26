@@ -38,26 +38,28 @@ def SoCVexRiscv(soc_cls, **kwargs):
             soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="standard", **kwargs)
 
             # Integrate int module
-            #self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
-            #self.add_csr("gpio_isr", 10, allow_user_defined=True)
-            #self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
+            # self.submodules.gpio_isr = GpioISR(self.platform.request('key', 0), rissing_edge_detect=False)
+            # self.add_csr("gpio_isr", 10, allow_user_defined=True)
+            # self.add_interrupt("gpio_isr", 5, allow_user_defined=True)
 
             # Integrate Adder8
-            #self.submodules.adder8 = Adder8()
-            #self.add_csr("adder8", 11, allow_user_defined=True)
+            # self.submodules.adder8 = Adder8()
+            # self.add_csr("adder8", 11, allow_user_defined=True)
 
             # Integrate my uart
-            #self.submodules.my_uart = my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
-            #my_uart.add_source(self.platform)
-            #self.add_csr("my_uart", 12, allow_user_defined=True)
+            # self.submodules.my_uart = my_uart = MyUart(self.platform.request("MyUart", 0), self.platform.request("led0", 0))
+            # my_uart.add_source(self.platform)
+            # self.add_csr("my_uart", 12, allow_user_defined=True)
 
             # Integrate simple wishbone gpio
-            #self.submodules.wb_gpio = wb_gpio = WbGpio(self.platform.request("led0", 0))
-            #self.register_mem("wb_gpio", 0x30000000, wb_gpio.bus, 1000)
+            # self.submodules.wb_gpio = wb_gpio = WbGpio(self.platform.request("led0", 0))
+            # self.register_mem("wb_gpio", 0x30000000, wb_gpio.bus, 1000)
 
             # Integrate CAN
-            self.submodules.can_controller = can_controller = SJA1000(self.platform.request("canif", 0))
-            self.register_mem("can_ctrl", 0x30000000, can_controller.bus, 1000)
-            can_controller.add_source(self.platform)
+            self.submodules.can_ctrl = can_ctrl = SJA1000(self.platform.request("canif", 0))
+            self.add_csr("can_ctrl", 13, allow_user_defined=True)
+            self.add_interrupt("can_ctrl", 6, allow_user_defined=True)
+            self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 1000)
+            can_ctrl.add_source(self.platform)
 
     return _SoCLinux(**kwargs)

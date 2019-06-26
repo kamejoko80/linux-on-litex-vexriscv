@@ -80,11 +80,23 @@ class WbGpio(Module):
         ]
 
 # SJA1000 opencore can controller module
-class SJA1000(Module):
-    def __init__(self, canif):
+class SJA1000(Module, AutoCSR):
+    def __init__(self, canif):    
+        # falling edge interrupt
+        self.submodules.ev = EventManager()
+        self.ev.can_irq = EventSourceProcess()
+        self.ev.finalize()
 
-        # wishbone bus 
+        # can interrupt signal
+        can_irq_signal = Signal()
+
+        # wishbone bus
         self.bus = bus = wishbone.Interface()
+
+        self.comb += [
+            self.ev.can_irq.trigger.eq(can_irq_signal),
+            canif.irq.eq(can_irq_signal) # drives the LED
+        ]
 
         self.specials += [
             Instance("can_top",
@@ -103,7 +115,7 @@ class SJA1000(Module):
                     i_rx_i       = canif.rx,
                     o_tx_o       = canif.tx,
                     o_bus_off_on = canif.boo,
-                    o_irq_on     = canif.irq,
+                    o_irq_on     = can_irq_signal,
                     o_clkout_o   = canif.clkout,
                     )
         ]
