@@ -5,6 +5,7 @@ import os
 
 from litex.soc.integration.builder import Builder
 
+from soc_custom import SoCCustom
 from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
@@ -143,6 +144,16 @@ class ULX3S(Board):
     def load(self):
         os.system("ujprog build/ulx3s/gateware/top.svf")
 
+# ICE40 HX8K support ------------------------------------------------------------------------------------
+
+class ICE40_HX8K_B_EVN(Board):
+    def __init__(self):
+        from litex.boards.targets import ice40_hx8k_b_evn
+        Board.__init__(self, ice40_hx8k_b_evn.BaseSoC, "serial")
+
+    def load(self):		
+        os.system("ujprog build/ice40_hx8k_b_evn/gateware/top.svf")
+
 # De0Nano support ------------------------------------------------------------------------------------
 
 class De0Nano(Board):
@@ -181,6 +192,7 @@ supported_boards = {
     # Lattice
     "versa_ecp5":   VersaECP5,
     "ulx3s":        ULX3S,
+    "ice40_hx8k_b_evn": ICE40_HX8K_B_EVN,
     # Altera/Intel
     "de0nano":      De0Nano,
     # QMA/Tech
@@ -212,7 +224,9 @@ def main():
             soc_kwargs["toolchain"] = "trellis"
         if board_name in ["qmatech"]:
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
-        else:   
+        elif board_name in ["ice40_hx8k_b_evn"]:
+            soc = SoCCustom(board.soc_cls, **soc_kwargs)
+        else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
 
         if args.build:
