@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import subprocess
 
 from litex.soc.integration.builder import Builder
 
@@ -151,8 +152,11 @@ class ICE40_HX8K_B_EVN(Board):
         from litex.boards.targets import ice40_hx8k_b_evn
         Board.__init__(self, ice40_hx8k_b_evn.BaseSoC, "serial")
 
-    def load(self):		
-        os.system("ujprog build/ice40_hx8k_b_evn/gateware/top.svf")
+    def flash(self):
+        print("Flash gateware image")
+        subprocess.call(["iceprog", "-o", "0", "build/ice40_hx8k_b_evn/gateware/top.bin"])
+        print("Flash bios image")
+        subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/bios/bios.bin"])        
 
 # De0Nano support ------------------------------------------------------------------------------------
 
