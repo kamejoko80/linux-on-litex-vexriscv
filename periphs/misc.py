@@ -121,10 +121,11 @@ class SJA1000(Module, AutoCSR):
         ]
 
     def add_source(self, platform):
+            platform.add_source(os.path.join("periphs/verilog/can", "timescale.v"))
+            platform.add_source(os.path.join("periphs/verilog/can", "can_defines.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_top.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_acf.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_btl.v"))
-            platform.add_source(os.path.join("periphs/verilog/can", "can_defines.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_ibo.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_register_asyn.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_register_syn.v"))
@@ -135,7 +136,7 @@ class SJA1000(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/can", "can_registers.v"))
             platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
 
-# Wishbone to avalon bridge            
+# Wishbone to avalon bridge
 class W2ABridge(Module):
     def __init__(self):
         self.bus = bus = wishbone.Interface()
