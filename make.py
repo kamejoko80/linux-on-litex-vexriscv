@@ -7,6 +7,7 @@ import subprocess
 from litex.soc.integration.builder import Builder
 
 from soc_ice40hx import SoCICE40HX
+from soc_ice40up import SoCICE40UP
 from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
@@ -156,7 +157,20 @@ class ICE40_HX8K_B_EVN(Board):
         print("Flash gateware image")
         subprocess.call(["iceprog", "-o", "0", "build/ice40_hx8k_b_evn/gateware/top.bin"])
         print("Flash bios image")
-        subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/bios/bios.bin"])        
+        subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/bios/bios.bin"])
+
+# ICE40 UP5K support ------------------------------------------------------------------------------------
+
+class ICE40_UP5K_B_EVN(Board):
+    def __init__(self):
+        from litex.boards.targets import ice40_up5k_b_evn
+        Board.__init__(self, ice40_up5k_b_evn.BaseSoC, "serial")
+
+    def flash(self):
+        print("Flash gateware image")
+        subprocess.call(["iceprog", "-o", "0", "build/ice40_up5k_b_evn/gateware/top.bin"])
+        print("Flash bios image")
+        subprocess.call(["iceprog", "-o", "0x20000", "build/ice40_up5k_b_evn/software/bios/bios.bin"])
 
 # De0Nano support ------------------------------------------------------------------------------------
 
@@ -197,6 +211,7 @@ supported_boards = {
     "versa_ecp5":   VersaECP5,
     "ulx3s":        ULX3S,
     "ice40_hx8k_b_evn": ICE40_HX8K_B_EVN,
+    "ice40_up5k_b_evn": ICE40_UP5K_B_EVN,    
     # Altera/Intel
     "de0nano":      De0Nano,
     # QMA/Tech
@@ -230,6 +245,8 @@ def main():
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
+        elif board_name in ["ice40_up5k_b_evn"]:
+            soc = SoCICE40UP(board.soc_cls, **soc_kwargs)            
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
 
