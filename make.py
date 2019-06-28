@@ -6,7 +6,7 @@ import subprocess
 
 from litex.soc.integration.builder import Builder
 
-from soc_custom import SoCCustom
+from soc_ice40hx import SoCICE40HX
 from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
@@ -229,7 +229,7 @@ def main():
         if board_name in ["qmatech"]:
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
-            soc = SoCCustom(board.soc_cls, **soc_kwargs)
+            soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
 

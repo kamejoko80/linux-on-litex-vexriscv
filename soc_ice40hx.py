@@ -13,7 +13,7 @@ from periphs.misc import *
 
 # SoCCustom -----------------------------------------------------------------------------------------
 
-def SoCCustom(soc_cls, **kwargs):
+def SoCICE40HX(soc_cls, **kwargs):
     class _SoCLinux(soc_cls):
         soc_cls.csr_map.update({
             "ctrl":       0,
