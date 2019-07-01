@@ -42,12 +42,19 @@ _io = [
         Subsignal("boo", SimPins()),
         Subsignal("irq", SimPins()),
         Subsignal("clkout", SimPins())
+    ),
+    ("spi", 0,
+        Subsignal("sclk", SimPins()),
+        Subsignal("miso", SimPins()),
+        Subsignal("mosi", SimPins()),
+        Subsignal("csn", SimPins()),
+        Subsignal("irq", SimPins()),
     ),    
 ]
 
 class Platform(SimPlatform):
     default_clk_name = "sys_clk"
-    default_clk_period = 1 # ~ 1000MHz
+    default_clk_period = 1000 # ~ 1MHz
 
     def __init__(self):
         SimPlatform.__init__(self, "SIM", _io)
@@ -83,7 +90,7 @@ class LinuxSoC(SoCCore):
 
     def __init__(self, **kwargs):
         platform = Platform()
-        sys_clk_freq = int(1000e6)
+        sys_clk_freq = int(1e6)
         SoCCore.__init__(self, platform, clk_freq=sys_clk_freq,
             cpu_type="vexriscv", cpu_variant="linux",
             with_uart=False,
@@ -113,14 +120,22 @@ class LinuxSoC(SoCCore):
         # Integrate Adder8
         self.submodules.adder8 = Adder8()
         self.add_csr("adder8", 10, allow_user_defined=True)
-        
+
         # Integrate CAN
-        self.submodules.can_ctrl = can_ctrl = SJA1000(platform.request("canif", 0))
-        self.add_csr("can_ctrl", 11, allow_user_defined=True)
-        self.add_interrupt("can_ctrl", 6, allow_user_defined=True)
-        self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 512)
-        can_ctrl.add_source(platform)
-        platform.add_verilog_include_path("periphs/verilog/can")
+        # self.submodules.can_ctrl = can_ctrl = SJA1000(platform.request("canif", 0))
+        # self.add_csr("can_ctrl", 11, allow_user_defined=True)
+        # self.add_interrupt("can_ctrl", 6, allow_user_defined=True)
+        # self.register_mem("can_ctrl", 0x30000000, can_ctrl.bus, 512)
+        # can_ctrl.add_source(platform)
+        # platform.add_verilog_include_path("periphs/verilog/can")
+
+        # Integrate SPI master
+        self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
+        self.add_csr("spi_master", 11, allow_user_defined=True)
+        self.add_interrupt("spi_master", 6, allow_user_defined=True)
+        self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
+        spi_master.add_source(self.platform)
+        platform.add_verilog_include_path("periphs/verilog/spi")
 
 def main():
     parser = argparse.ArgumentParser(description="Linux on LiteX-VexRiscv Simulation")

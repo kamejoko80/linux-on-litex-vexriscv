@@ -137,7 +137,7 @@ class SJA1000(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
 
 # Opencore SPI master
-class SpiMaster(Module, AutoCSR):
+class SpiMaster(Module, AutoCSR):    
     def __init__(self, pads):
         # falling edge interrupt
         self.submodules.ev = EventManager()
@@ -147,23 +147,8 @@ class SpiMaster(Module, AutoCSR):
         # can interrupt signal
         spi_irq_signal = Signal()
 
-        # wb mem_decoder signal
-        a = Signal()
-        b = Signal()
-        c = Signal()
-        d = Signal()
-        
         # wishbone bus
         self.bus = bus = wishbone.Interface()
-
-        self.comb += [
-            self.ev.spi_irq.trigger.eq(spi_irq_signal),
-            pads.irq.eq(spi_irq_signal), # drives the LED
-            a.eq(bus.adr >= 0x30000000),
-            b.eq(bus.adr <= 0x30000018),
-            c.eq(a & b),
-            d.eq(c& bus.stb),
-        ]
 
         self.specials += [
             Instance("spi_top",
@@ -175,7 +160,7 @@ class SpiMaster(Module, AutoCSR):
                     i_wb_sel_i   = bus.sel,
                     i_wb_we_i    = bus.we,
                     i_wb_cyc_i   = bus.cyc,
-                    i_wb_stb_i   = d,
+                    i_wb_stb_i   = bus.stb,
                     o_wb_dat_o   = bus.dat_r,
                     o_wb_ack_o   = bus.ack,
                     o_wb_err_o   = bus.err,
@@ -195,7 +180,7 @@ class SpiMaster(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_shift.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_top.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "timescale.v"))
-            
+
 # Wishbone to avalon bridge
 class W2ABridge(Module):
     def __init__(self):
