@@ -79,6 +79,32 @@ class WbGpio(Module):
             )
         ]
 
+# Wishbone to avalon bridge
+class W2ABridge(Module):
+    def __init__(self):
+        self.bus = bus = wishbone.Interface()
+
+        self.specials += [
+            Instance("wb_to_avalon_bridge",
+                    # WB IF
+                    i_wb_clk_i = ClockSignal(),
+                    i_wb_rst_i = ResetSignal(),
+                    i_wb_adr_i = bus.adr,
+                    i_wb_dat_i = bus.dat_w,
+                    i_wb_sel_i = bus.sel,
+                    i_wb_we_i  = bus.we,
+                    i_wb_cyc_i = bus.cyc,
+                    i_wb_stb_i = bus.stb,
+                    i_wb_cti_i = bus.cti,
+                    i_wb_bte_i = bus.bte,
+                    o_wb_dat_o = bus.dat_r,
+                    o_wb_ack_o = bus.ack,
+                    )
+        ]
+
+    def add_source(self, platform):
+            platform.add_source(os.path.join("periphs/verilog/w2a", "wb_to_avalon_bridge.v"))
+
 # SJA1000 opencore can controller module
 class SJA1000(Module, AutoCSR):
     def __init__(self, canif):    
@@ -150,6 +176,13 @@ class SpiMaster(Module, AutoCSR):
         # wishbone bus
         self.bus = bus = wishbone.Interface()
 
+        # inverted clk output
+        sclk_inv = Signal()
+
+        self.comb += [
+           pads.sclk.eq(~sclk_inv) 
+        ]
+
         self.specials += [
             Instance("spi_top",
                     # WB IF
@@ -168,7 +201,7 @@ class SpiMaster(Module, AutoCSR):
                     # SPI signals
                     o_wb_int_o   = spi_irq_signal, # SPI IRQ
                     o_ss_pad_o   = pads.csn,       # SPI chip select need
-                    o_sclk_pad_o = pads.sclk,      # SPI clkout
+                    o_sclk_pad_o = sclk_inv,       # SPI clkout
                     o_mosi_pad_o = pads.mosi,      # SPI mosi
                     i_miso_pad_i = pads.miso,      # SPI miso
                     )
@@ -180,69 +213,4 @@ class SpiMaster(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_shift.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_top.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "timescale.v"))
-
-# Opencore SPI lite master
-class SpiLiteMaster(Module, AutoCSR):    
-    def __init__(self, pads):
-        # falling edge interrupt
-        self.submodules.ev = EventManager()
-        self.ev.spi_irq = EventSourceProcess()
-        self.ev.finalize()
-
-        # can interrupt signal
-        spi_irq_signal = Signal()
-
-        # wishbone bus
-        self.bus = bus = wishbone.Interface()
-
-        self.specials += [
-            Instance("simple_spi_top",
-                    # WB IF
-                    i_clk_i   = ClockSignal(),
-                    i_rst_i   = ResetSignal(),
-                    i_adr_i   = bus.adr,
-                    i_dat_i   = bus.dat_w,
-                    i_we_i    = bus.we,
-                    i_cyc_i   = bus.cyc,
-                    i_stb_i   = bus.stb,
-                    o_dat_o   = bus.dat_r,
-                    o_ack_o   = bus.ack,
-
-                    # SPI signals
-                    o_inta_o  = spi_irq_signal, # SPI IRQ
-                    o_sck_o   = pads.sclk,      # SPI clkout
-                    o_mosi_o  = pads.mosi,      # SPI mosi
-                    i_miso_i  = pads.miso,      # SPI miso
-                    )
-        ]
-
-    def add_source(self, platform):
-            platform.add_source(os.path.join("periphs/verilog/spi_lite", "simple_spi_top.v"))
-            platform.add_source(os.path.join("periphs/verilog/spi_lite", "fifo4.v"))
-            platform.add_source(os.path.join("periphs/verilog/spi_lite", "timescale.v"))            
-
-# Wishbone to avalon bridge
-class W2ABridge(Module):
-    def __init__(self):
-        self.bus = bus = wishbone.Interface()
-
-        self.specials += [
-            Instance("wb_to_avalon_bridge",
-                    # WB IF
-                    i_wb_clk_i = ClockSignal(),
-                    i_wb_rst_i = ResetSignal(),
-                    i_wb_adr_i = bus.adr,
-                    i_wb_dat_i = bus.dat_w,
-                    i_wb_sel_i = bus.sel,
-                    i_wb_we_i  = bus.we,
-                    i_wb_cyc_i = bus.cyc,
-                    i_wb_stb_i = bus.stb,
-                    i_wb_cti_i = bus.cti,
-                    i_wb_bte_i = bus.bte,
-                    o_wb_dat_o = bus.dat_r,
-                    o_wb_ack_o = bus.ack,
-                    )
-        ]
-
-    def add_source(self, platform):
-            platform.add_source(os.path.join("periphs/verilog/w2a", "wb_to_avalon_bridge.v"))          
+     

@@ -62,7 +62,7 @@ def SoCICE40HX(soc_cls, **kwargs):
                 platform.spiflash_total_size - (self.flash_boot_address - self.mem_map["spiflash"]) - 0x100)
                 
             # Integrate SPI master
-            self.submodules.spi_master = spi_master = SpiLiteMaster(self.platform.request("spi", 0))
+            self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
             self.add_csr("spi_master", 10, allow_user_defined=True)
             self.add_interrupt("spi_master", 6, allow_user_defined=True)
             self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
