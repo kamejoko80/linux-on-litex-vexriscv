@@ -48,7 +48,7 @@ def SoCICE40UP(soc_cls, **kwargs):
             self.add_csr("spiflash", 5, allow_user_defined=True)
             self.register_mem("spiflash", self.mem_map["spiflash"], self.spiflash.bus, size=platform.spiflash_total_size)
 
-            bios_size = 0x8000
+            bios_size = 0x10000
             self.add_constant("ROM_DISABLE", 1)
             self.add_memory_region("rom", cpu_reset_address, bios_size)
             self.flash_boot_address = self.mem_map["spiflash"] + platform.gateware_size+bios_size

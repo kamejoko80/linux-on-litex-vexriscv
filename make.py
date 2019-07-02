@@ -159,6 +159,11 @@ class ICE40_HX8K_B_EVN(Board):
         print("Flash bios image")
         subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/bios/bios.bin"])
 
+    def flash_fw(self):
+        print("Flash frimware image")
+        subprocess.call(["iceprog", "-o", "0x40000", "build/ice40_hx8k_b_evn/software/firmware/firmware.bin"])        
+        
+        
 # ICE40 UP5K support ------------------------------------------------------------------------------------
 
 class ICE40_UP5K_B_EVN(Board):
@@ -171,6 +176,10 @@ class ICE40_UP5K_B_EVN(Board):
         subprocess.call(["iceprog", "-o", "0", "build/ice40_up5k_b_evn/gateware/top.bin"])
         print("Flash bios image")
         subprocess.call(["iceprog", "-o", "0x20000", "build/ice40_up5k_b_evn/software/bios/bios.bin"])
+
+    def flash_fw(self):
+        print("Flash frimware image")
+        subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/firmware/firmware.bin"])
 
 # De0Nano support ------------------------------------------------------------------------------------
 
@@ -226,8 +235,10 @@ def main():
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--board", required=True, help="FPGA board")
     parser.add_argument("--build", action="store_true", help="build bitstream")
+    parser.add_argument("--build_sw", action="store_true", help="build software only")    
     parser.add_argument("--load", action="store_true", help="load bitstream (to SRAM)")
     parser.add_argument("--flash", action="store_true", help="flash bitstream/images (to SPI Flash)")
+    parser.add_argument("--flash_fw", action="store_true", help="flash firmware (to SPI Flash)")
     parser.add_argument("--local-ip", default="192.168.1.50", help="local IP address")
     parser.add_argument("--remote-ip", default="192.168.1.100", help="remote IP address of TFTP server")
     args = parser.parse_args()
@@ -246,12 +257,18 @@ def main():
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_up5k_b_evn"]:
-            soc = SoCICE40UP(board.soc_cls, **soc_kwargs)            
+            soc = SoCICE40UP(board.soc_cls, **soc_kwargs)
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
 
         if args.build:
             builder = Builder(soc, output_dir="build/" + board_name)
+            builder.add_software_package(name="firmware")
+            builder.build()
+
+        if args.build_sw:
+            builder = Builder(soc, output_dir="build/" + board_name, compile_gateware=False)
+            builder.add_software_package(name="firmware")
             builder.build()
 
         if args.load:
@@ -259,6 +276,9 @@ def main():
 
         if args.flash:
             board.flash()
+
+        if args.flash_fw:
+            board.flash_fw()
 
 if __name__ == "__main__":
     main()
