@@ -165,13 +165,10 @@ class SJA1000(Module, AutoCSR):
 # Opencore SPI master
 class SpiMaster(Module, AutoCSR):    
     def __init__(self, pads):
-        # falling edge interrupt
+        # rissing edge interrupt
         self.submodules.ev = EventManager()
-        self.ev.spi_irq = EventSourceProcess()
+        self.ev.spi_irq = EventSourcePulse()
         self.ev.finalize()
-
-        # can interrupt signal
-        spi_irq_signal = Signal()
 
         # wishbone bus
         self.bus = bus = wishbone.Interface()
@@ -199,7 +196,7 @@ class SpiMaster(Module, AutoCSR):
                     o_wb_err_o   = bus.err,
 
                     # SPI signals
-                    o_wb_int_o   = spi_irq_signal, # SPI IRQ
+                    o_wb_int_o   = self.ev.spi_irq.trigger, # SPI IRQ
                     o_ss_pad_o   = pads.csn,       # SPI chip select need
                     o_sclk_pad_o = sclk_inv,       # SPI clkout
                     o_mosi_pad_o = pads.mosi,      # SPI mosi
