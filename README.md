@@ -44,7 +44,6 @@ $ cp -r linux-on-litex-vexriscv-prebuilt/* linux-on-litex-vexriscv
 
 ## Installing LiteX
 ```sh
-$ wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
 $ chmod +x litex_setup.py
 $ ./litex_setup.py init install --user
 ```
