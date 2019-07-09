@@ -9,8 +9,13 @@
 // Half period (in ms)
 #define HALF_PER_PS ((vluint64_t)1000/(2*CLK_FREQ_MHZ))
 
+// Accel commandArgs
+#define REG_RD (0x0B) // CMD = 1, Read Register
+#define REG_WR (0x0A) // CMD = 2, Write Register
+#define FIF_RD (0x0D) // CMD = 3, FIFO Read
+
 // SDI pattern
-#define SDI_PATT (0xFA)
+#define SDI_PATT 0x0B
 
 int main(int argc, char **argv, char **env) {
   
@@ -51,16 +56,16 @@ int main(int argc, char **argv, char **env) {
     }
     else
     {
-        //top->sdi_i = !top->sdi_i;
         toggle = toggle^1;
         
-        if(toggle)
+        if(toggle && !top->csn_i && hcycle > 3)
         {
             // Shift bit
             sdi_pattern <<= 1; 
         }  
     }
     
+    // Generate sdi signal following data pattern
     if((toggle) && (sdi_pattern & 0x80))
     {
         top->sdi_i = 1;

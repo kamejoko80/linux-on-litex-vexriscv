@@ -17,16 +17,19 @@ class Accel(Module):
         
         self.reg_i = Signal(8)
         self.cnt   = Signal(8)
+        self.cmd   = Signal(2) # cmd = {0, 1, 2, 3} invalid, reg read, reg write, fifo read 
         
         # Reset counter when csn_i low
         self.sync.csni += [
             self.reg_i.eq(0),
             self.cnt.eq(0),
+            self.cmd.eq(0),
         ]
 
         # Read sdi_i
         self.sync.sckp += [
-            If((self.cnt < 8) & ~csn_i, 
+            If((self.cnt < 8) & ~csn_i,
+               self.cnt.eq(self.cnt + 1),            
                If(sdi_i, 
                     self.reg_i[0].eq(1)
                ).Else(
@@ -37,9 +40,20 @@ class Accel(Module):
 
         # Shift bit
         self.sync.sckn += [
-            If((self.cnt < 8) & ~csn_i,
-               self.cnt.eq(self.cnt + 1),             
-               self.reg_i.eq(self.reg_i << 1)
+            If( ~csn_i,
+               If(self.cnt < 8,
+                  self.reg_i.eq(self.reg_i << 1)                  
+               ).Elif(self.cnt == 8, 
+                     If(self.reg_i == 0x0B, 
+                        self.cmd.eq(1) # Read Register
+                     ).Elif(self.reg_i == 0x0A, 
+                        self.cmd.eq(2) # Write Register
+                     ).Elif(self.reg_i == 0x0D, 
+                        self.cmd.eq(3) # Read FIFO data
+                     ).Else(
+                        self.cmd.eq(0) # Invalide command
+                     )  
+               ) 
             )
         ]
 
