@@ -51,7 +51,7 @@ class SPISimple(Module):
         ]
 
         for i, d in enumerate(self.data):
-            self.comb += getattr(pads, "mosi{}".format(i)).eq(d[-1])
+            self.comb += getattr(pads, "mosi{}".format(i)).eq(d[-1]) # mosi = MSB of d
 
         bits = Signal(max=p.width + 1, reset_less=True)
 
@@ -85,7 +85,7 @@ class SPISimple(Module):
             If(fsm.ce,
                 If(fsm.before_leaving("HOLD"),
                     bits.eq(bits - 1),
-                    [d[1:].eq(d) for d in self.data]
+                    [d[1:].eq(d) for d in self.data] # shift d = d << 1
                 ),
                 If(fsm.ongoing("IDLE"),
                     bits.eq(p.width)
