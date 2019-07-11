@@ -3,7 +3,7 @@
 #include "verilated_vcd_c.h"
 
 // Number of simulation cycles
-#define NUM_CYCLES  ((vluint64_t)200)
+#define NUM_CYCLES  ((vluint64_t)1000)
 // Frequency (in MHz)
 #define CLK_FREQ_MHZ (50)
 // Half period (in ms)
@@ -23,7 +23,7 @@ int main(int argc, char **argv, char **env) {
   vluint64_t hcycle;
   char toggle; 
   vluint16_t sdi_pattern;
-  char count;
+
   
   
   Verilated::commandArgs(argc, argv);
@@ -42,20 +42,43 @@ int main(int argc, char **argv, char **env) {
   top->sys_clk = 0;
   top->sys_rst = 0;
   toggle       = 1;
-  sdi_pattern  = SDI_PATT;   
-  count = 0; 
+  sdi_pattern  = SDI_PATT;
+
+  char count = 0; 
+  char count2 = 0;    
+  
+  top->sck = 1; 
+  
    
   // run simulation for NUM_CYCLES clock periods
   for (hcycle = 0; hcycle < (NUM_CYCLES * 2); ) 
   {
     
+    if(hcycle == 15)
+    {
+        top->start = 1;
+    }
+    
+    if (hcycle > 5)
+    {
+        if (count2 < 10)
+        {
+            count2++;
+        }
+        else 
+        {
+            top->sck = top->sck^1;
+            count2 = 0;
+        }   
+    }
+
     if(hcycle % 2 == 0 )
     {
         top->sys_clk = !top->sys_clk;
     }
     else
     {
-        if (count < 4)
+        if (count < 10)
         {
             count++;
         }
@@ -74,10 +97,10 @@ int main(int argc, char **argv, char **env) {
             // Generate sdi signal following data pattern
             if((toggle) && (sdi_pattern & 0x8000))
             {
-                top->s = 1;
+                top->si = 1;
             }else
             {
-                top->s = 0;
+                top->si = 0;
             }
         }
     }
