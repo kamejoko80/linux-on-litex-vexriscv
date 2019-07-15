@@ -199,6 +199,165 @@ class CascadingShifter(Module):
             self.done.eq(sto.done),
         ]
 
+class Register(Module):
+    def __init__(self, addr=0):
+        self.reg    = Signal(8)
+        self.addr   = Signal(8)
+        self.dw     = Signal(8)
+        self.dr     = Signal(8)
+        self.r      = Signal()
+        self.w      = Signal()
+
+        self.sync += [
+            If(self.addr == addr,
+                If(self.w,
+                    self.reg.eq(self.dw)
+                ).Elif(self.r,
+                    self.dr.eq(self.reg)
+                )
+            )
+        ]
+
+class Control(Module):
+    def __init__(self):
+        # Physical pin signals
+        self.sck     = Signal()
+        self.so      = Signal()
+        self.si      = Signal()
+
+        # Input signals interface
+        self.dout    = Signal(8)
+        self.si_done = Signal()
+        self.so_done = Signal()
+        self.start   = Signal()
+
+        # Output signals interface
+        self.din      = Signal(8)
+        self.addr     = Signal(8)
+        self.dw       = Signal(8)
+        self.dr       = Signal(8)
+        self.r        = Signal()
+        self.w        = Signal()
+        self.si_start = Signal()
+        self.so_start = Signal()
+
+        # Internal registers
+        self.str_addr = Signal(8)
+        self.str_data = Signal(8)
+        self.str_cmd  = Signal(8)
+
+        # Define edgedetecter, shifter in/out
+        edt = EdgeDetector()
+        sti = ShifterIn()
+        sto = ShifterOut()
+        self.submodules += edt, sti, sto
+
+        # Connect to edgedetecter, shifter in/out 
+        self.comb += [
+            edt.s.eq(self.sck),
+            sti.rising.eq(edt.r),
+            sti.falling.eq(edt.f),
+            sto.rising.eq(edt.r),
+            sto.falling.eq(edt.f),
+            sti.sck.eq(self.sck),
+            sto.sck.eq(self.sck),
+            sti.si.eq(self.si),
+            self.so.eq(sto.so),
+            #sti.start.eq(self.si_start),
+            #sto.start.eq(self.so_start),
+        ]
+
+        # Connect to register set
+        reg0 = Register(addr = 0x00)
+        reg1 = Register(addr = 0x01)
+        reg2 = Register(addr = 0x02)
+
+        self.submodules += reg0, reg1, reg2
+
+        self.comb += [
+            # Reg0
+            reg0.addr.eq(self.addr),
+            reg0.r.eq(self.r),
+            reg0.w.eq(self.w),
+            reg0.dw.eq(self.dw),
+            self.dr.eq(reg0.dr),
+            # Reg1
+            reg1.addr.eq(self.addr),
+            reg1.r.eq(self.r),
+            reg1.w.eq(self.w),
+            reg1.dw.eq(self.dw),
+            self.dr.eq(reg1.dr),
+            # Reg2
+            reg1.addr.eq(self.addr),
+            reg1.r.eq(self.r),
+            reg1.w.eq(self.w),
+            reg1.dw.eq(self.dw),
+            self.dr.eq(reg1.dr),
+        ]
+
+        fsm = FSM(reset_state = "IDLE")
+        self.submodules += fsm
+        
+        fsm.act("IDLE",
+            If(self.start,
+                NextValue(self.start, 0),
+                NextValue(sti.start, 1),
+                NextState("GET_COMMAND"),
+            )
+        )        
+        fsm.act("GET_COMMAND",
+            If(sti.done,
+                NextValue(self.str_cmd, sti.dout),
+                NextState("CMD_DECODE"),
+            )
+        )        
+        fsm.act("CMD_DECODE",
+            If(self.str_addr == 0x0A, # Reg write
+                NextValue(sti.start, 1),
+                NextState("REG_ADDR"),                
+            ).Elif(self.str_addr == 0x0B, # Reg read
+                NextValue(sti.start, 1),
+                NextState("REG_ADDR"),
+            ).Elif(self.str_addr == 0x0D, # Reg read
+                NextState("READ_FIFO"),
+            ).Else(
+                NextState("IDLE"),
+            )
+        )
+        fsm.act("REG_ADDR",
+            If(sti.done,
+                NextValue(self.str_addr, sti.dout),
+                NextState("REG_ACCESS"),
+            )
+        )
+        fsm.act("REG_ACCESS",
+            If(self.str_addr == 0x0A, # Reg write
+                NextValue(sti.start, 1),
+                NextState("REG_DATA"),
+            ).Elif(self.str_addr == 0x0B, # Reg read
+                NextValue(self.addr, self.str_addr),
+                NextValue(self.r, 1),
+                NextState("REG_READ"),
+            ).Else(
+                NextState("IDLE"),
+            )
+        )
+        fsm.act("REG_DATA",
+            If(sti.done,
+                NextValue(self.w, sti.dout),
+                NextValue(self.w, 1),
+                NextState("IDLE"),
+            )
+        )
+        fsm.act("REG_READ",
+            NextValue(sto.din, self.dr),
+            NextValue(sto.start, 1),
+            NextState("IDLE"),
+        )
+        fsm.act("READ_FIFO",
+
+        )
+
 class TestEdgeDetector(Module):
     def __init__(self):
         self.inp     = Signal() # Signal input
@@ -293,7 +452,32 @@ def CascadingShifterGenerator(dut):
 
         yield
 
+def ControlGenerator(dut):
+    cnt1 = 0
+    cnt2 = 0
+    for cycle in range(1000):
 
+        if cycle % 2 != 0:
+            if cnt1 < 10:
+                cnt1 = cnt1 + 1
+            else:
+                cnt1 = 0
+                yield dut.sck.eq(~dut.sck)
+
+        if cnt2 < 20:
+            cnt2 = cnt2 + 1
+        else:
+            cnt2 = 0
+            yield dut.si.eq(randrange(2))
+                
+                
+        if cycle > 2 and cycle < 4:
+            yield dut.start.eq(1)
+
+        yield        
+        
+        
+        
 if __name__ == "__main__":
     #d = EdgeDetector()
     # print(verilog.convert(EdgeDetector()))
@@ -316,9 +500,13 @@ if __name__ == "__main__":
     #run_simulation(t, ShifterOutGenerator(t), clocks={"sys": 10}, vcd_name="ShifterOut.vcd")
     #os.system("gtkwave ShifterOut.vcd")    
 
-    t = CascadingShifter()
+    #t = CascadingShifter()
     #print(verilog.convert(CascadingShifter()))
-    run_simulation(t, CascadingShifterGenerator(t), clocks={"sys": 10}, vcd_name="CascadingShifter.vcd")
-    os.system("gtkwave CascadingShifter.vcd")
+    #run_simulation(t, CascadingShifterGenerator(t), clocks={"sys": 10}, vcd_name="CascadingShifter.vcd")
+    #os.system("gtkwave CascadingShifter.vcd")
 
+    t = Control()
+    # print(verilog.convert(Control()))
+    run_simulation(t, ControlGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
+    os.system("gtkwave Control.vcd")    
     
