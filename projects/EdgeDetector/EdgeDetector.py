@@ -199,31 +199,46 @@ class CascadingShifter(Module):
             self.done.eq(sto.done),
         ]
 
-class Register(Module):
-    def __init__(self, addr=0):
-        self.reg    = Signal(8)
+class RegisterArray(Module):
+    def __init__(self):
         self.addr   = Signal(8)
         self.dw     = Signal(8)
         self.dr     = Signal(8)
         self.r      = Signal()
         self.w      = Signal()
+        
+        # Register set
+        self.reg0   = Signal(8, reset=0xAD)
+        self.reg1   = Signal(8, reset=0x1D)
+        self.reg2   = Signal(8, reset=0xF2)        
 
         self.sync += [
-            If(self.addr == addr,
-                If(self.w,
-                    self.reg.eq(self.dw)
-                ).Elif(self.r,
-                    self.dr.eq(self.reg)
+            If(self.r,
+                If(self.addr == 0,
+                    self.dr.eq(self.reg0)
+                ).Elif(self.addr == 1,
+                    self.dr.eq(self.reg1)
+                ).Elif(self.addr == 2,
+                    self.dr.eq(self.reg2)
                 )
-            )
+            ).Elif(self.w,
+                If(self.addr == 0,
+                    self.reg0.eq(self.dw)
+                ).Elif(self.addr == 1,
+                    self.reg1.eq(self.dw)
+                ).Elif(self.addr == 2,
+                    self.reg2.eq(self.dw)
+                )
+            )            
         ]
-
+        
 class Control(Module):
     def __init__(self):
         # Physical pin signals
         self.sck     = Signal()
         self.so      = Signal()
         self.si      = Signal()
+        self.csn     = Signal(1, reset=1)        
 
         # Input signals interface
         self.dout    = Signal(8)
@@ -232,7 +247,7 @@ class Control(Module):
         self.start   = Signal()
 
         # Output signals interface
-        self.din      = Signal(8)
+        #self.din      = Signal(8)
         self.addr     = Signal(8)
         self.dw       = Signal(8)
         self.dr       = Signal(8)
@@ -245,62 +260,62 @@ class Control(Module):
         self.str_addr = Signal(8)
         self.str_data = Signal(8)
         self.str_cmd  = Signal(8)
+        self.cnt      = Signal(8)
+        self.reg_done = Signal()  
 
         # Define edgedetecter, shifter in/out
-        edt = EdgeDetector()
+        edt1 = EdgeDetector()
+        edt2 = EdgeDetector()
         sti = ShifterIn()
         sto = ShifterOut()
-        self.submodules += edt, sti, sto
+        self.submodules += edt1, edt2, sti, sto
 
         # Connect to edgedetecter, shifter in/out 
         self.comb += [
-            edt.s.eq(self.sck),
-            sti.rising.eq(edt.r),
-            sti.falling.eq(edt.f),
-            sto.rising.eq(edt.r),
-            sto.falling.eq(edt.f),
+            edt1.s.eq(self.sck),
+            sti.rising.eq(edt1.r),
+            sti.falling.eq(edt1.f),
+            sto.rising.eq(edt1.r),
+            sto.falling.eq(edt1.f),
             sti.sck.eq(self.sck),
             sto.sck.eq(self.sck),
             sti.si.eq(self.si),
             self.so.eq(sto.so),
+            edt2.s.eq(self.csn),
             #sti.start.eq(self.si_start),
             #sto.start.eq(self.so_start),
         ]
 
         # Connect to register set
-        reg0 = Register(addr = 0x00)
-        reg1 = Register(addr = 0x01)
-        reg2 = Register(addr = 0x02)
-
-        self.submodules += reg0, reg1, reg2
-
+        reg = RegisterArray()
+        self.submodules += reg
+        
         self.comb += [
-            # Reg0
-            reg0.addr.eq(self.addr),
-            reg0.r.eq(self.r),
-            reg0.w.eq(self.w),
-            reg0.dw.eq(self.dw),
-            self.dr.eq(reg0.dr),
-            # Reg1
-            reg1.addr.eq(self.addr),
-            reg1.r.eq(self.r),
-            reg1.w.eq(self.w),
-            reg1.dw.eq(self.dw),
-            self.dr.eq(reg1.dr),
-            # Reg2
-            reg1.addr.eq(self.addr),
-            reg1.r.eq(self.r),
-            reg1.w.eq(self.w),
-            reg1.dw.eq(self.dw),
-            self.dr.eq(reg1.dr),
+            reg.addr.eq(self.addr),
+            reg.r.eq(self.r),
+            reg.w.eq(self.w),
+            reg.dw.eq(self.dw),
+            self.dr.eq(reg.dr),
         ]
-
+        
         fsm = FSM(reset_state = "IDLE")
         self.submodules += fsm
-        
+
         fsm.act("IDLE",
+            If(edt2.f, # csn falling edge
+                NextValue(self.cnt, 0),
+                NextState("START"),
+            )
+        )
+        fsm.act("START",
+            If(self.cnt >= 2,
+                NextValue(self.start, 1),
+            ).Else(
+                 NextValue(self.cnt, self.cnt + 1),
+            ),            
             If(self.start,
                 NextValue(self.start, 0),
+                NextValue(sti.done, 0),
                 NextValue(sti.start, 1),
                 NextState("GET_COMMAND"),
             )
@@ -312,13 +327,15 @@ class Control(Module):
             )
         )        
         fsm.act("CMD_DECODE",
-            If(self.str_addr == 0x0A, # Reg write
+            If(self.str_cmd == 0x0A, # Reg write
+                NextValue(sti.done, 0),
                 NextValue(sti.start, 1),
                 NextState("REG_ADDR"),                
-            ).Elif(self.str_addr == 0x0B, # Reg read
+            ).Elif(self.str_cmd == 0x0B, # Reg read
+                NextValue(sti.done, 0), 
                 NextValue(sti.start, 1),
                 NextState("REG_ADDR"),
-            ).Elif(self.str_addr == 0x0D, # Reg read
+            ).Elif(self.str_cmd == 0x0D, # Reg read
                 NextState("READ_FIFO"),
             ).Else(
                 NextState("IDLE"),
@@ -327,33 +344,59 @@ class Control(Module):
         fsm.act("REG_ADDR",
             If(sti.done,
                 NextValue(self.str_addr, sti.dout),
-                NextState("REG_ACCESS"),
+                NextState("DETERMINE_REG_ACCESS"),
             )
         )
-        fsm.act("REG_ACCESS",
-            If(self.str_addr == 0x0A, # Reg write
+        fsm.act("DETERMINE_REG_ACCESS",
+            If(self.str_cmd == 0x0A, # Reg write
+                NextValue(sti.done, 0),
                 NextValue(sti.start, 1),
-                NextState("REG_DATA"),
-            ).Elif(self.str_addr == 0x0B, # Reg read
+                NextState("REG_VALUE_SHIFTIN"),
+            ).Elif(self.str_cmd == 0x0B, # Reg read
                 NextValue(self.addr, self.str_addr),
-                NextValue(self.r, 1),
-                NextState("REG_READ"),
+                NextState("REG_READ_STROBE"),
             ).Else(
                 NextState("IDLE"),
             )
         )
-        fsm.act("REG_DATA",
+        fsm.act("REG_VALUE_SHIFTIN",
             If(sti.done,
                 NextValue(self.w, sti.dout),
                 NextValue(self.w, 1),
-                NextState("IDLE"),
+                NextState("REG_WRITE_VALUE"),
             )
         )
-        fsm.act("REG_READ",
-            NextValue(sto.din, self.dr),
-            NextValue(sto.start, 1),
-            NextState("IDLE"),
+        fsm.act("REG_WRITE_VALUE",
+            NextValue(self.w, 0),
+            NextState("IDLE"),        
         )
+        fsm.act("REG_READ_STROBE",
+            NextValue(self.r, 1),
+            NextState("START_SHIFT_OUT"),        
+        )        
+        fsm.act("START_SHIFT_OUT",
+            NextValue(sto.din, self.dr),
+            NextValue(self.r, 0),
+            NextValue(sto.done, 0),
+            NextValue(sto.start, 1),
+            NextState("SHIFTING_OUT"),            
+        )        
+        fsm.act("SHIFTING_OUT",
+            If(sto.done,
+                NextState("SHIFT_OUT_DONE"),    
+            )            
+        )
+        fsm.act("SHIFT_OUT_DONE",
+            If(edt2.r | self.csn, # csn rising edge
+                NextState("IDLE"),    
+            ).Elif(self.addr < 0x2D,
+                NextValue(self.addr, self.addr + 1),
+                NextValue(self.r, 1),
+                NextState("START_SHIFT_OUT"),
+            ).Else(
+                NextState("IDLE"),
+            )            
+        )        
         fsm.act("READ_FIFO",
 
         )
@@ -453,31 +496,33 @@ def CascadingShifterGenerator(dut):
         yield
 
 def ControlGenerator(dut):
-    cnt1 = 0
-    cnt2 = 0
+    t = 3  # Number of si transfer byte
+    u = 5  # Number of shifted byte
+    s = 4  # SCK toggle at cycle 4th
+    n = 10 # n cycles per sck toggle
+    i = 0
+    j = 0    
+    cmd_addr = 0x0B00
+    
     for cycle in range(1000):
-
-        if cycle % 2 != 0:
-            if cnt1 < 10:
-                cnt1 = cnt1 + 1
+        # Generate si
+        if cycle == (s + j*n*2) and j < 2*8*t:
+            if (cmd_addr & 0x8000):
+                yield dut.si.eq(1)
             else:
-                cnt1 = 0
-                yield dut.sck.eq(~dut.sck)
+                yield dut.si.eq(0)
+            cmd_addr = cmd_addr << 1            
+            j = j + 1    
+        # Generate sck
+        if cycle == (s + n/2 + i*n) and i < 2*8*u:
+            yield dut.sck.eq(~dut.sck)
+            i = i + 1
 
-        if cnt2 < 20:
-            cnt2 = cnt2 + 1
-        else:
-            cnt2 = 0
-            yield dut.si.eq(randrange(2))
-                
-                
-        if cycle > 2 and cycle < 4:
-            yield dut.start.eq(1)
+        if cycle > 1 and cycle < 3:
+            yield dut.csn.eq(0)
 
         yield        
-        
-        
-        
+    
 if __name__ == "__main__":
     #d = EdgeDetector()
     # print(verilog.convert(EdgeDetector()))
@@ -506,7 +551,7 @@ if __name__ == "__main__":
     #os.system("gtkwave CascadingShifter.vcd")
 
     t = Control()
-    # print(verilog.convert(Control()))
+    #print(verilog.convert(Control()))
     run_simulation(t, ControlGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
     os.system("gtkwave Control.vcd")    
     
