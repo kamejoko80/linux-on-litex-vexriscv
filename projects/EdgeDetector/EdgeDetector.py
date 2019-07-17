@@ -595,8 +595,8 @@ def CascadingShifterGenerator(dut):
         yield
 
 def ControlReadRegGenerator(dut):
-    t = 3  # Number of si transfer byte
-    u = 5  # Number of shifted byte
+    t = 3  # Number of transfer byte on si line
+    u = 5  # Number of total shifted byte
     s = 4  # SCK toggle at cycle 4th
     n = 10 # n cycles per sck toggle
     i = 0
@@ -625,22 +625,22 @@ def ControlReadRegGenerator(dut):
         yield
 
 def ControlWriteRegGenerator(dut):
-    t = 3  # Number of si transfer byte
-    u = 3  # Number of shifted byte
+    t = 3  # Number of transfer byte on si line
+    u = 3  # Number of total shifted byte
     s = 4  # SCK toggle at cycle 4th
     n = 10 # n cycles per sck toggle
     i = 0
     j = 0
-    cmd_addr = 0x0A2055
+    cmd_addr_data = 0x0A2055
 
     for cycle in range(1000):
         # Generate si
         if cycle == (s + j*n*2) and j < 2*8*t:
-            if (cmd_addr & 0x800000):
+            if (cmd_addr_data & 0x800000):
                 yield dut.si.eq(1)
             else:
                 yield dut.si.eq(0)
-            cmd_addr = cmd_addr << 1
+            cmd_addr_data = cmd_addr_data << 1
             j = j + 1
         # Generate sck
         if cycle == (s + n/2 + i*n) and i < 2*8*u:
@@ -654,6 +654,80 @@ def ControlWriteRegGenerator(dut):
 
         yield
 
+def ControlWriteReadRegGenerator(dut):
+    n             = 10 # n cycles per sck toggle
+    flag1         = 0
+    flag2         = 0   
+    wr_done_cycle = 0
+    wr_space      = n  # Gap (cycles) between read/write frames
+    cmd_addr_data = 0x0A2055 # Write register
+    cmd_addr      = 0x0B20   # Read register 
+    
+    #################### For write phase ##################
+    t  = 3 # Number of transfer byte on si line (write phase)
+    u  = 3 # Number of total shifted byte (write phase)
+    sw = 4 # SCK toggle at cycle 4th (write phase)
+    i  = 0
+    j  = 0    
+    #################### For read phase ###################
+    y  = 2 # Number of transfer byte on si line (read phase)
+    z  = 3 # Number of total shifted byte (read phase)
+    sr = 0 # SCK toggle at cycle 4th (read phase)
+    k  = 0
+    h  = 0
+
+    for cycle in range(2000):
+        
+        #################### Start new write phase ##################        
+        if cycle > 1 and cycle < 3:
+            yield dut.csn.eq(0)
+            
+        # Generate si
+        if cycle == (sw + i*n*2) and i < 2*8*t:
+            if (cmd_addr_data & 0x800000):
+                yield dut.si.eq(1)
+            else:
+                yield dut.si.eq(0)
+            cmd_addr_data = cmd_addr_data << 1
+            i = i + 1
+                
+        # Generate sck for write phase
+        if cycle == (sw + n/2 + j*n) and j < 2*8*u:
+            yield dut.sck.eq(~dut.sck)
+            j = j + 1
+        elif j == 2*8*u and flag1 == 0:
+            print("Write done at cycle: {}".format(cycle))
+            wr_done_cycle = cycle
+            sr = wr_done_cycle + wr_space
+            yield dut.csn.eq(1)
+            flag1 = 1
+        
+        #################### Start new read phase ##################
+
+        if flag1 == 1:
+            if cycle == wr_done_cycle + wr_space/2:
+                yield dut.csn.eq(0)
+                print("sr = : {}".format(sr)) 
+ 
+            # Generate si read phase
+            if cycle == (sr + k*n*2) and k < 2*8*y:
+                if (cmd_addr & 0x8000):
+                    yield dut.si.eq(1)
+                else:
+                    yield dut.si.eq(0)
+                cmd_addr = cmd_addr << 1
+                k = k + 1
+    
+            # Generate sck for read phase
+            if cycle == (sr + n/2 + h*n) and h < 2*8*z:
+                yield dut.sck.eq(~dut.sck)
+                h = h + 1
+            elif h == 2*8*z and flag2 == 0:
+                yield dut.csn.eq(1)            
+                flag2 = 1
+
+        yield        
+        
 if __name__ == "__main__":
     #d = EdgeDetector()
     # print(verilog.convert(EdgeDetector()))
@@ -684,6 +758,7 @@ if __name__ == "__main__":
     t = Control()
     #print(verilog.convert(Control()))
     #run_simulation(t, ControlReadRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
-    run_simulation(t, ControlWriteRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
+    #run_simulation(t, ControlWriteRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
+    run_simulation(t, ControlWriteReadRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
     os.system("gtkwave Control.vcd")
     
