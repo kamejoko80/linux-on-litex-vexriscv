@@ -208,22 +208,115 @@ class RegisterArray(Module):
         self.w      = Signal()
 
         # Register set
-        self.reg0   = Signal(8, reset=0xAD)
-        self.reg1   = Signal(8, reset=0x1D)
-        self.reg2   = Signal(8, reset=0xF2)
+        self.reg0   = Signal(8, reset=0xAD) # DEVID_AD       [R]
+        self.reg1   = Signal(8, reset=0x1D) # DEVID_MST      [R]
+        self.reg2   = Signal(8, reset=0xF2) # PARTID         [R]
+        self.reg3   = Signal(8, reset=0x01) # REVID          [R]
 
+        self.reg8   = Signal(8, reset=0x00) # XDATA          [R] internally writeable
+        self.reg9   = Signal(8, reset=0x00) # YDATA          [R] internally writeable
+        self.reg10  = Signal(8, reset=0x00) # ZDATA          [R] internally writeable
+        self.reg11  = Signal(8, reset=0x40) # STATUS         [R] internally writeable
+        self.reg12  = Signal(8, reset=0x00) # FIFO_ENTRIES_L [R] internally writeable
+        self.reg13  = Signal(8, reset=0x00) # FIFO_ENTRIES_H [R] internally writeable
+        self.reg14  = Signal(8, reset=0x00) # XDATA_L        [R] internally writeable
+        self.reg15  = Signal(8, reset=0x00) # XDATA_H        [R] internally writeable
+        self.reg16  = Signal(8, reset=0x00) # YDATA_L        [R] internally writeable
+        self.reg17  = Signal(8, reset=0x00) # YDATA_H        [R] internally writeable
+        self.reg18  = Signal(8, reset=0x00) # ZDATA_L        [R] internally writeable
+        self.reg19  = Signal(8, reset=0x00) # ZDATA_H        [R] internally writeable
+        self.reg20  = Signal(8, reset=0x00) # TEMP_L         [R] internally writeable
+        self.reg21  = Signal(8, reset=0x00) # TEMP_H         [R] internally writeable
+      
+        self.reg31  = Signal(8, reset=0x00) # SOFT_RESET     [W]
+        self.reg32  = Signal(8, reset=0x00) # THRESH_ACT_L   [RW]
+        self.reg33  = Signal(8, reset=0x00) # THRESH_ACT_H   [RW]
+        self.reg34  = Signal(8, reset=0x00) # TIME_ACT       [RW]
+        self.reg35  = Signal(8, reset=0x00) # THRESH_INACT_L [RW] 
+        self.reg36  = Signal(8, reset=0x00) # THRESH_INACT_H [RW]
+        self.reg37  = Signal(8, reset=0x00) # TIME_INACT_L   [RW] 
+        self.reg38  = Signal(8, reset=0x00) # TIME_INACT_H   [RW]
+        self.reg39  = Signal(8, reset=0x00) # ACT_INACT_CTL  [RW]         
+        self.reg40  = Signal(8, reset=0x00) # FIFO_CONTRO    [RW]
+        self.reg41  = Signal(8, reset=0x00) # FIFO_SAMPLES   [RW] 
+        self.reg42  = Signal(8, reset=0x00) # INTMAP1        [RW]
+        self.reg43  = Signal(8, reset=0x00) # INTMAP2        [RW]
+        self.reg44  = Signal(8, reset=0x13) # FILTER_CTL     [RW] 
+        self.reg45  = Signal(8, reset=0x40) # POWER_CTL      [RW] 
+        self.reg46  = Signal(8, reset=0x00) # SELF_TEST      [RW] 
+        
         self.sync += [
             If(self.r,
                 Case(self.addr, {
-                    0: self.dr.eq(self.reg0),
-                    1: self.dr.eq(self.reg1),
-                    2: self.dr.eq(self.reg2),
+                    0:  self.dr.eq( self.reg0),
+                    1:  self.dr.eq( self.reg1),
+                    2:  self.dr.eq( self.reg2),
+                    3:  self.dr.eq( self.reg3),
+
+                    8:  self.dr.eq( self.reg8),
+                    9:  self.dr.eq( self.reg9),
+                    10: self.dr.eq(self.reg10),
+                    11: self.dr.eq(self.reg11),
+                    12: self.dr.eq(self.reg12),
+                    13: self.dr.eq(self.reg13),
+                    14: self.dr.eq(self.reg14),
+                    15: self.dr.eq(self.reg15),
+                    16: self.dr.eq(self.reg16),
+                    17: self.dr.eq(self.reg17),
+                    18: self.dr.eq(self.reg18),
+                    19: self.dr.eq(self.reg19),
+                    20: self.dr.eq(self.reg20),
+                    21: self.dr.eq(self.reg21),
+
+                    32: self.dr.eq(self.reg32),
+                    33: self.dr.eq(self.reg33),
+                    34: self.dr.eq(self.reg34),
+                    35: self.dr.eq(self.reg35),
+                    36: self.dr.eq(self.reg36),
+                    37: self.dr.eq(self.reg37),
+                    38: self.dr.eq(self.reg38),
+                    39: self.dr.eq(self.reg39),
+                    40: self.dr.eq(self.reg40),
+                    41: self.dr.eq(self.reg41),
+                    42: self.dr.eq(self.reg42),
+                    43: self.dr.eq(self.reg43),
+                    44: self.dr.eq(self.reg44),
+                    45: self.dr.eq(self.reg45),
+                    46: self.dr.eq(self.reg46),                    
                 })
             ).Elif(self.w,
                 Case(self.addr, {
-                    0: self.reg0.eq(self.dw),
-                    1: self.reg1.eq(self.dw),
-                    2: self.reg2.eq(self.dw),
+                    8:  self.reg8.eq( self.dw),
+                    9:  self.reg9.eq( self.dw),
+                    10: self.reg10.eq(self.dw),
+                    11: self.reg11.eq(self.dw),
+                    12: self.reg12.eq(self.dw),
+                    13: self.reg13.eq(self.dw),
+                    14: self.reg14.eq(self.dw),
+                    15: self.reg15.eq(self.dw),
+                    16: self.reg16.eq(self.dw),
+                    17: self.reg17.eq(self.dw),
+                    18: self.reg18.eq(self.dw),
+                    19: self.reg19.eq(self.dw),
+                    20: self.reg20.eq(self.dw),
+                    21: self.reg21.eq(self.dw),
+
+                    31: self.reg31.eq(self.dw),
+                    32: self.reg32.eq(self.dw),
+                    33: self.reg33.eq(self.dw),
+                    34: self.reg34.eq(self.dw),
+                    35: self.reg35.eq(self.dw),
+                    36: self.reg36.eq(self.dw),
+                    37: self.reg37.eq(self.dw),
+                    38: self.reg38.eq(self.dw),
+                    39: self.reg39.eq(self.dw),
+                    40: self.reg40.eq(self.dw),
+                    41: self.reg41.eq(self.dw),
+                    42: self.reg42.eq(self.dw),
+                    43: self.reg43.eq(self.dw),
+                    44: self.reg44.eq(self.dw),
+                    45: self.reg45.eq(self.dw),
+                    46: self.reg46.eq(self.dw),                    
                 })
             )
         ]
@@ -256,10 +349,10 @@ class Control(Module):
         self.reg_done = Signal()
 
         # Define edgedetecter, shifter in/out
-        edt1 = EdgeDetector()
+        edt1 = ResetInserter()(EdgeDetector())
         edt2 = EdgeDetector()
-        sti = ShifterIn()
-        sto = ShifterOut()
+        sti  = ResetInserter()(ShifterIn())
+        sto  = ResetInserter()(ShifterOut())
         self.submodules += edt1, edt2, sti, sto
 
         # Connect to edgedetecter, shifter in/out
@@ -288,8 +381,17 @@ class Control(Module):
             self.dr.eq(reg.dr),
         ]
 
-        fsm = FSM(reset_state = "IDLE")
+        # Submodule FSM
+        fsm = ResetInserter()(FSM(reset_state = "IDLE"))
         self.submodules += fsm
+
+        # Make sure csn can reset submodules
+        self.comb += [
+            fsm.reset.eq(self.csn),
+            edt1.reset.eq(self.csn),
+            sti.reset.eq(self.csn),
+            sto.reset.eq(self.csn),
+        ]
 
         fsm.act("IDLE",
             If(edt2.f, # csn falling edge
@@ -352,6 +454,7 @@ class Control(Module):
         )
         fsm.act("REG_VALUE_SHIFTIN",
             If(sti.done,
+                NextValue(self.addr, self.str_addr),
                 NextValue(self.dw, sti.dout),
                 NextValue(self.w, 1),
                 NextState("REG_WRITE_STROBE"),
@@ -528,7 +631,7 @@ def ControlWriteRegGenerator(dut):
     n = 10 # n cycles per sck toggle
     i = 0
     j = 0
-    cmd_addr = 0x0A0155
+    cmd_addr = 0x0A2055
 
     for cycle in range(1000):
         # Generate si
@@ -543,7 +646,9 @@ def ControlWriteRegGenerator(dut):
         if cycle == (s + n/2 + i*n) and i < 2*8*u:
             yield dut.sck.eq(~dut.sck)
             i = i + 1
-
+        elif i >= 2*8*u:
+            yield dut.csn.eq(1)
+            
         if cycle > 1 and cycle < 3:
             yield dut.csn.eq(0)
 
@@ -578,7 +683,7 @@ if __name__ == "__main__":
 
     t = Control()
     #print(verilog.convert(Control()))
-    run_simulation(t, ControlReadRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
-    #run_simulation(t, ControlWriteRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
+    #run_simulation(t, ControlReadRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
+    run_simulation(t, ControlWriteRegGenerator(t), clocks={"sys": 10}, vcd_name="Control.vcd")
     os.system("gtkwave Control.vcd")
     
