@@ -114,7 +114,7 @@ class RegisterArray(Module):
         self.reg42  = Signal(8, reset=0x00) # INTMAP1        [RW]
         self.reg43  = Signal(8, reset=0x00) # INTMAP2        [RW]
         self.reg44  = Signal(8, reset=0x13) # FILTER_CTL     [RW]
-        self.reg45  = Signal(8, reset=0x40) # POWER_CTL      [RW]
+        self.reg45  = Signal(8, reset=0x00) # POWER_CTL      [RW]
         self.reg46  = Signal(8, reset=0x00) # SELF_TEST      [RW]
 
         self.sync += [
@@ -406,11 +406,11 @@ class SpiSlave(Module):
         self.comb += [
             self.txr.eq(~self.csn & (self.bitcnt == 0)),    
         ]        
-              
-def SpiSlaveGenerator(dut):
+
+def SpiSlaveTestBench(dut):
     cnt1 = 0
     cnt2 = 0
-    for cycle in range(1000):
+    for cycle in range(2000):
 
         if cycle % 2 != 0:
             if cnt1 < 10:
@@ -425,10 +425,10 @@ def SpiSlaveGenerator(dut):
             cnt2 = 0
             yield dut.mosi.eq(randrange(2))
 
-        if cycle > 0 and cycle < 2:
+        if cycle >= 0 and cycle < 2:
             yield dut.csn.eq(1)
             
-        if cycle > 2 and cycle < 4:
+        if cycle > 30 and cycle < 32:
             yield dut.csn.eq(0)
             yield dut.txd.eq(0xA5)  
 
@@ -509,7 +509,7 @@ def WriteReadRegTestBench(dut):
     #################### For write phase ##################
     t  = 3 # Number of transfer byte on si line (write phase)
     u  = 3 # Number of total shifted byte (write phase)
-    sw = 4 # SCK toggle at cycle 4th (write phase)
+    sw = 6 # SCK toggle at cycle 4th (write phase)
     i  = 0
     j  = 0
     #################### For read phase ###################
@@ -522,7 +522,10 @@ def WriteReadRegTestBench(dut):
     for cycle in range(2000):
 
         #################### Start new write phase ##################
-        if cycle > 1 and cycle < 3:
+        if cycle >= 0 and cycle < 2:
+            yield dut.csn.eq(1)
+            
+        if cycle > 3 and cycle < 5:
             yield dut.csn.eq(0)
 
         # Generate si
@@ -572,9 +575,10 @@ def WriteReadRegTestBench(dut):
         yield
 
 if __name__ == "__main__":
+
     dut = SpiSlave()
     #print(verilog.convert(SpiSlave()))
-    run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
     #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
+    run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
     #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
     #os.system("gtkwave SpiSlave.vcd")
