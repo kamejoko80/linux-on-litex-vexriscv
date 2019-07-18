@@ -51,24 +51,121 @@ class Debouncer(Module):
 
 class EdgeDetector(Module):
     def __init__(self):
-        self.i   = Signal() # Signal input
-        self.r   = Signal() # Rising edge detect
-        self.f   = Signal() # Falling edge detect
-        self.csn = Signal() # SPI csn pin
-        self.cnt = Signal(2)
-        
-        self.comb += [
-            self.r.eq(self.cnt == 1),
-            self.f.eq(self.cnt == 2),
-        ]
-        
+        self.s = Signal() # Signal input
+        self.d = Signal() # Delay signal output
+        self.e = Signal() # e = s ^ d
+        self.r = Signal() # Rising edge detect
+        self.f = Signal() # Falling edge detect
+
         self.sync += [
-            If(self.csn,
-               self.cnt.eq(0),
-            ).Else(
-               self.cnt[1].eq(self.cnt[0]),
-               self.cnt[0].eq(self.i),                
+            self.d.eq(self.s)
+        ]
+
+        self.comb += [
+            self.e.eq(self.d ^ self.s),
+            self.r.eq(self.e & self.s),
+            self.f.eq(self.e & ~self.s),
+        ]
+
+class ShifterIn(Module):
+    def __init__(self):
+        self.sck     = Signal()
+        self.si      = Signal()
+        self.start   = Signal()
+        self.rising  = Signal()
+        self.falling = Signal()
+        self.done    = Signal()
+        self.dout    = Signal(8)
+        self.cnt     = Signal(4)
+
+        fsm = FSM(reset_state = "IDLE")
+        edt = EdgeDetector()
+
+        self.submodules += fsm
+
+        fsm.act("IDLE",
+            If(self.start == 1,
+                NextValue(self.cnt, 0x00),
+                NextState("SHIFTING"),
             )
+        )
+        fsm.act("SHIFTING",
+            If(self.cnt == 8,
+                NextValue(self.done, 1),
+                NextState("IDLE"),
+            ),
+            If(self.rising,
+                If(self.cnt < 8,
+                    NextValue(self.cnt, self.cnt + 1),
+                    If(self.si,
+                        NextValue(self.dout[0], 1),
+                    ).Else(
+                        NextValue(self.dout[0], 0),
+                    )
+                )
+            ),
+            If(self.falling,
+                If(self.cnt < 8,
+                    NextValue(self.dout, self.dout << 1)
+                )
+            )
+        )
+
+        self.sync += [
+            If(self.rising, self.start.eq(0)),
+            If(self.falling, self.done.eq(0))
+        ]
+
+class ShifterOut(Module):
+    def __init__(self):
+        self.sck     = Signal()
+        self.so      = Signal()
+        self.start   = Signal()
+        self.rising  = Signal()
+        self.falling = Signal()
+        self.done    = Signal()
+        self.din     = Signal(8)
+        self.cnt     = Signal(4)
+
+        fsm = FSM(reset_state = "IDLE")
+        edt = EdgeDetector()
+
+        self.submodules += fsm
+
+        fsm.act("IDLE",
+            If(self.start == 1,
+                NextValue(self.cnt, 0x00),
+                NextState("SHIFTING"),
+            )
+        )
+        fsm.act("SHIFTING",
+            If(self.cnt == 8,
+                NextValue(self.done, 1),
+                NextValue(self.so, 0),
+                NextState("IDLE"),
+            ),
+            If(self.rising,
+                If(self.cnt < 8, # Hold
+                    NextValue(self.cnt, self.cnt + 1),
+                    NextValue(self.din, self.din << 1)
+                ).Else(
+                    NextValue(self.so, 0)
+                )
+            ),
+            If(self.falling,
+                If(self.cnt < 8, # Setup
+                    If(self.din[7],
+                        NextValue(self.so, 1),
+                    ).Else(
+                        NextValue(self.so, 0),
+                    )
+                )
+            )
+        )
+
+        self.sync += [
+            If(self.falling, self.start.eq(0)),
+            If(self.falling, self.done.eq(0))
         ]
 
 class RegisterArray(Module):
@@ -155,7 +252,6 @@ class RegisterArray(Module):
                     44: self.dr.eq(self.reg44),
                     45: self.dr.eq(self.reg45),
                     46: self.dr.eq(self.reg46),
-             "default": self.dr.eq(0),
                 })
             ).Elif(self.w,
                 Case(self.addr, {
@@ -194,246 +290,185 @@ class RegisterArray(Module):
             )
         ]
 
-class SpiSlave(Module):
+class AccelCore(Module):
     def __init__(self):
-        # Physical pins interface
-        self.sck  = Signal()  # SCK pin input
-        self.mosi = Signal()  # MOSI pin input
-        self.miso = Signal()  # MISO pin output
-        self.csn  = Signal()  # CSN pin input   
-        
-        # Led debug
-        self.led  = Signal(8)
-        
-        # Internal core signals
-        self.rxc  = Signal()  # Data RX complete
-        self.txr  = Signal()  # Data TX request
-        self.rxd  = Signal(8) # RX data
-        self.txd  = Signal(8) # TX data
-      
-        # Misc signals
-        self.sck_cnt  = Signal(2) # SCK edge detect counter
-        self.sck_r    = Signal()  # SCK rising edge detect signal
-        self.sck_f    = Signal()  # SCK falling edge detect signal         
-        self.csn_cnt  = Signal(2) # CSN edge detect counter
-        self.csn_f    = Signal()  # SCK falling edge detect signal
-        self.mosi_cnt = Signal(2) # MOSI edge detect counter      
-        self.bitcnt   = Signal(3) # Bit count
-        self.mosi_s   = Signal()  # MOSI sample
-        self.tx_buf   = Signal(8) # TX data buffer 
-        
-        # Register set internal bus, signals
-        self.bus_addr = Signal(8)
-        self.bus_dw   = Signal(8)
-        self.bus_dr   = Signal(8)
-        self.bus_r    = Signal()
-        self.bus_w    = Signal()
+        # Physical pin signals
+        self.sck     = Signal()
+        self.so      = Signal()
+        self.si      = Signal()
+        self.csn     = Signal(1, reset=1)
 
-        # CMD & ADDR storage
-        self.str_cmd  = Signal(8)
+        # Input signals interface
+        self.dout    = Signal(8)
+        self.si_done = Signal()
+        self.so_done = Signal()
+        self.start   = Signal()
+
+        # Output signals interface
+        self.addr     = Signal(8)
+        self.dw       = Signal(8)
+        self.dr       = Signal(8)
+        self.r        = Signal()
+        self.w        = Signal()
+
+        # Internal registers
         self.str_addr = Signal(8)
-        
-        # Need debouncer to get better rising/falling detection
-        sck_db  = Debouncer(cycles=1)
-        mosi_db = Debouncer(cycles=1)
-        csn_db  = Debouncer(cycles=1)
-        self.submodules += sck_db, mosi_db, csn_db
+        self.str_cmd  = Signal(8)
+        self.cnt      = Signal(8)
+        self.reg_done = Signal()
 
-        # Connect to debouncer I/O
+        # Define edgedetecter, shifter in/out
+        edt1 = ResetInserter()(EdgeDetector())
+        edt2 = EdgeDetector()
+        sti  = ResetInserter()(ShifterIn())
+        sto  = ResetInserter()(ShifterOut())
+        self.submodules += edt1, edt2, sti, sto
+
+        # Connect to edgedetecter, shifter in/out
         self.comb += [
-            sck_db.i.eq(self.sck),
-            mosi_db.i.eq(self.mosi),
-            csn_db.i.eq(self.csn),
-        ]        
-        
+            edt1.s.eq(self.sck),
+            sti.rising.eq(edt1.r),
+            sti.falling.eq(edt1.f),
+            sto.rising.eq(edt1.r),
+            sto.falling.eq(edt1.f),
+            sti.sck.eq(self.sck),
+            sto.sck.eq(self.sck),
+            sti.si.eq(self.si),
+            self.so.eq(sto.so),
+            edt2.s.eq(self.csn),
+        ]
+
         # Connect to register set
         reg = RegisterArray()
         self.submodules += reg
 
         self.comb += [
-            reg.addr.eq(self.bus_addr),
-            reg.r.eq(self.bus_r),
-            reg.w.eq(self.bus_w),
-            reg.dw.eq(self.bus_dw),
-            self.bus_dr.eq(reg.dr),
+            reg.addr.eq(self.addr),
+            reg.r.eq(self.r),
+            reg.w.eq(self.w),
+            reg.dw.eq(self.dw),
+            self.dr.eq(reg.dr),
         ]
-        
-        # Submodule FSM handles data in/out activities
+
+        # Submodule FSM
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
-        self.submodules += fsm        
-        
-        # To make sure we can reset the FSM properly
+        self.submodules += fsm
+
+        # Make sure csn can reset submodules
         self.comb += [
             fsm.reset.eq(self.csn),
+            edt1.reset.eq(self.csn),
+            sti.reset.eq(self.csn),
+            sto.reset.eq(self.csn),
         ]
-        
-        # FSM behavior description
+
         fsm.act("IDLE",
-            If(self.csn_f,
-                NextState("CMD_PHASE"),
+            If(edt2.f, # csn falling edge
+                NextValue(self.cnt, 0),
+                NextState("START"),
             )
         )
-        fsm.act("CMD_PHASE",
-            If(self.rxc,
-                NextValue(self.str_cmd, self.rxd),
+        fsm.act("START",
+            If(self.cnt >= 2,
+                NextValue(self.start, 1),
+            ).Else(
+                 NextValue(self.cnt, self.cnt + 1),
+            ),
+            If(self.start,
+                NextValue(self.start, 0),
+                NextValue(sti.done, 0),
+                NextValue(sti.start, 1),
+                NextState("GET_COMMAND"),
+            )
+        )
+        fsm.act("GET_COMMAND",
+            If(sti.done,
+                NextValue(self.str_cmd, sti.dout),
                 NextState("CMD_DECODE"),
             )
-        )        
+        )
         fsm.act("CMD_DECODE",
             If(self.str_cmd == 0x0A, # Reg write
-                NextState("ADDR_PHASE"),
+                NextValue(sti.done, 0),
+                NextValue(sti.start, 1),
+                NextState("REG_ADDR"),
             ).Elif(self.str_cmd == 0x0B, # Reg read
-                NextState("ADDR_PHASE"),
+                NextValue(sti.done, 0),
+                NextValue(sti.start, 1),
+                NextState("REG_ADDR"),
             ).Elif(self.str_cmd == 0x0D, # FIFO read
                 NextState("READ_FIFO"),
             ).Else(
-                NextValue(self.led, 0xFF), 
                 NextState("IDLE"),
             )
-        )        
-        fsm.act("ADDR_PHASE",
-            If(self.rxc,
-                NextValue(self.str_addr, self.rxd),
+        )
+        fsm.act("REG_ADDR",
+            If(sti.done,
+                NextValue(self.str_addr, sti.dout),
                 NextState("DETERMINE_REG_ACCESS"),
             )
-        )        
+        )
         fsm.act("DETERMINE_REG_ACCESS",
             If(self.str_cmd == 0x0A, # Reg write
+                NextValue(sti.done, 0),
+                NextValue(sti.start, 1),
                 NextState("REG_VALUE_SHIFTIN"),
             ).Elif(self.str_cmd == 0x0B, # Reg read
-                NextValue(self.bus_addr, self.str_addr),
-                NextValue(self.bus_r, 1),
-                NextState("LOAD_SHIFT_OUT_DATA"),
+                NextValue(self.addr, self.str_addr),
+                NextValue(self.r, 1),
+                NextState("REG_READ_STROBE"),
             ).Else(
                 NextState("IDLE"),
             )
-        )        
+        )
         fsm.act("REG_VALUE_SHIFTIN",
-            If(self.rxc,
-                NextValue(self.bus_addr, self.str_addr),
-                NextValue(self.bus_dw, self.rxd),
-                NextValue(self.bus_w, 1),
+            If(sti.done,
+                NextValue(self.addr, self.str_addr),
+                NextValue(self.dw, sti.dout),
+                NextValue(self.w, 1),
                 NextState("REG_WRITE_STROBE"),
             )
-        )        
+        )
         fsm.act("REG_WRITE_STROBE",
             NextState("REG_WRITE_VALUE"),
         )
         fsm.act("REG_WRITE_VALUE",
-            NextValue(self.bus_w, 0),
+            NextValue(self.w, 0),
             NextState("IDLE"),
         )
-        fsm.act("LOAD_SHIFT_OUT_DATA",
-            NextState("LOAD_TX_BUF"),
+        fsm.act("REG_READ_STROBE",
+            NextState("LOAD_SHIFT_OUT_DATA"),
         )
-        fsm.act("LOAD_TX_BUF",
-            NextValue(self.tx_buf, self.bus_dr),
-            NextValue(self.bus_r, 0),
+        fsm.act("LOAD_SHIFT_OUT_DATA",
+            NextValue(sto.din, self.dr),
+            NextState("START_SHIFT_OUT"),
+        )
+        fsm.act("START_SHIFT_OUT",
+            NextValue(self.r, 0),
+            NextValue(sto.done, 0),
+            NextValue(sto.start, 1),
             NextState("SHIFTING_OUT"),
-        )        
+        )
         fsm.act("SHIFTING_OUT",
-            If(self.rxc,
+            If(sto.done,
                 NextState("SHIFT_OUT_DONE"),
             )
-        )        
+        )
         fsm.act("SHIFT_OUT_DONE",
-            If(self.bus_addr < 0x2D,
-                NextValue(self.bus_addr, self.bus_addr + 1),
-                NextValue(self.bus_r, 1),
-                NextState("LOAD_SHIFT_OUT_DATA"),
+            If(edt2.r | self.csn, # csn rising edge
+                NextState("IDLE"),
+            ).Elif(self.addr < 0x2D,
+                NextValue(self.addr, self.addr + 1),
+                NextValue(self.r, 1),
+                NextState("REG_READ_STROBE"),
             ).Else(
                 NextState("IDLE"),
             )
         )
         fsm.act("READ_FIFO",
 
-        )        
-        
-        # Edge detect signal combinatorial
-        self.comb += [
-            self.sck_r.eq(self.sck_cnt == 1),
-            self.sck_f.eq(self.sck_cnt == 2),
-            self.csn_f.eq(self.csn_cnt == 2),            
-        ]
-        
-        # MOSI data sampling
-        self.comb += [
-            self.mosi_s.eq(self.mosi_cnt[1]),
-        ]
-        
-        # Edge detector behavior description
-        self.sync += [
-            self.sck_cnt[1].eq(self.sck_cnt[0]),
-            self.sck_cnt[0].eq(sck_db.o),
-            self.csn_cnt[1].eq(self.csn_cnt[0]),
-            self.csn_cnt[0].eq(self.csn),                
-            self.mosi_cnt[1].eq(self.mosi_cnt[0]),
-            self.mosi_cnt[0].eq(mosi_db.o),
-        ]
+        )
 
-        # RX data behavior description
-        self.sync += [
-            If(self.csn,
-                self.bitcnt.eq(0),
-                self.rxd.eq(0),
-            ).Elif(self.sck_f,
-                self.bitcnt.eq(self.bitcnt+1),
-                self.rxd.eq(self.rxd << 1),
-                self.rxd[0].eq(self.mosi_s),
-            )
-        ]
-            
-        # RX completed notification
-        self.sync += [       
-            self.rxc.eq(~self.csn & self.sck_f & (self.bitcnt == 7)),
-        ]
-        
-        # TX data behavior description
-        self.sync += [
-            If(self.csn,
-                self.tx_buf.eq(0),
-            ).Elif(self.sck_f,
-                self.tx_buf.eq(self.tx_buf<<1),
-            )            
-        ]        
-        
-        # MISO output behavior description
-        self.comb += [
-            self.miso.eq(self.tx_buf[7]),
-        ]
-        
-        # TX data request notification
-        self.comb += [
-            self.txr.eq(~self.csn & (self.bitcnt == 0)),    
-        ]        
-              
-def SpiSlaveGenerator(dut):
-    cnt1 = 0
-    cnt2 = 0
-    for cycle in range(1000):
-
-        if cycle % 2 != 0:
-            if cnt1 < 10:
-                cnt1 = cnt1 + 1
-            else:
-                cnt1 = 0
-                yield dut.sck.eq(~dut.sck)
-
-        if cnt2 < 20:
-            cnt2 = cnt2 + 1
-        else:
-            cnt2 = 0
-            yield dut.mosi.eq(randrange(2))
-
-        if cycle > 0 and cycle < 2:
-            yield dut.csn.eq(1)
-            
-        if cycle > 2 and cycle < 4:
-            yield dut.csn.eq(0)
-            yield dut.txd.eq(0xA5)  
-
-        yield        
-        
 def ReadRegTestBench(dut):
     t = 3  # Number of transfer byte on si line
     u = 5  # Number of total shifted byte
@@ -441,15 +476,15 @@ def ReadRegTestBench(dut):
     n = 10 # n cycles per sck toggle
     i = 0
     j = 0
-    cmd_addr = 0x0B02
+    cmd_addr = 0x0B00
 
     for cycle in range(1000):
         # Generate si
         if cycle == (s + j*n*2) and j < 2*8*t:
             if (cmd_addr & 0x8000):
-                yield dut.mosi.eq(1)
+                yield dut.si.eq(1)
             else:
-                yield dut.mosi.eq(0)
+                yield dut.si.eq(0)
             cmd_addr = cmd_addr << 1
             j = j + 1
         # Generate sck
@@ -459,10 +494,7 @@ def ReadRegTestBench(dut):
         elif i >= 2*8*u:
             yield dut.csn.eq(1)
 
-        if cycle > 0 and cycle < 3:
-            yield dut.csn.eq(1)            
-            
-        if cycle > 3 and cycle < 5:
+        if cycle > 1 and cycle < 3:
             yield dut.csn.eq(0)
 
         yield
@@ -528,9 +560,9 @@ def WriteReadRegTestBench(dut):
         # Generate si
         if cycle == (sw + i*n*2) and i < 2*8*t:
             if (cmd_addr_data & 0x800000):
-                yield dut.mosi.eq(1)
+                yield dut.si.eq(1)
             else:
-                yield dut.mosi.eq(0)
+                yield dut.si.eq(0)
             cmd_addr_data = cmd_addr_data << 1
             i = i + 1
 
@@ -552,12 +584,12 @@ def WriteReadRegTestBench(dut):
                 yield dut.csn.eq(0)
                 print("sr = : {}".format(sr))
 
-            # Generate mosi read phase
+            # Generate si read phase
             if cycle == (sr + k*n*2) and k < 2*8*y:
                 if (cmd_addr & 0x8000):
-                    yield dut.mosi.eq(1)
+                    yield dut.si.eq(1)
                 else:
-                    yield dut.mosi.eq(0)
+                    yield dut.si.eq(0)
                 cmd_addr = cmd_addr << 1
                 k = k + 1
 
@@ -572,9 +604,10 @@ def WriteReadRegTestBench(dut):
         yield
 
 if __name__ == "__main__":
-    dut = SpiSlave()
-    #print(verilog.convert(SpiSlave()))
-    run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #os.system("gtkwave SpiSlave.vcd")
+    dut = AccelCore()
+    print(verilog.convert(AccelCore()))
+    #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #os.system("gtkwave AccelCore.vcd")
+    

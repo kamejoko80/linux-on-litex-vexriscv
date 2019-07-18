@@ -11,7 +11,7 @@ _io = [
     ("user_led", 4, Pins("C5"), IOStandard("LVCMOS33")),
     ("user_led", 5, Pins("C4"), IOStandard("LVCMOS33")),
     ("user_led", 6, Pins("B3"), IOStandard("LVCMOS33")),
-    # ("user_led", 7, Pins("C3"), IOStandard("LVCMOS33")),
+    ("user_led", 7, Pins("C3"), IOStandard("LVCMOS33")),
 
     ("serial", 0,
         Subsignal("rx", Pins("B10")),
@@ -36,7 +36,7 @@ _io = [
         Subsignal("miso", Pins("F1"), IOStandard("LVCMOS33")),
         Subsignal("mosi", Pins("E2"), IOStandard("LVCMOS33")),
         Subsignal("csn", Pins("F2"), IOStandard("LVCMOS33")),
-        Subsignal("irq", Pins("C3"), IOStandard("LVCMOS33")),
+        #Subsignal("irq", Pins("C3"), IOStandard("LVCMOS33")),
     ),
 
     ("clk12", 0, Pins("J3"), IOStandard("LVCMOS33"))
