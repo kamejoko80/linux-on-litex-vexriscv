@@ -10,6 +10,7 @@ from litex.soc.integration.soc_core import mem_decoder
 from litex.soc.cores.spi_flash import SpiFlash
 
 from periphs.misc import *
+from periphs.spi_slave import *
 
 # SoCVexRiscv -----------------------------------------------------------------------------------------
 
@@ -65,6 +66,9 @@ def SoCVexRiscv(soc_cls, **kwargs):
             # Integrate wishbone to avalon bridge
             self.submodules.w2a_bridge = w2a_bridge = W2ABridge()
             self.register_mem("w2a_bridge", 0x30000000, w2a_bridge.bus, 1000)
-            w2a_bridge.add_source(self.platform)            
+            w2a_bridge.add_source(self.platform)
+
+            # Custome SPI slave
+            self.submodules.spi_slave = spi_slave = SpiSlave(self.platform.request("spi", 0))
             
     return _SoCLinux(**kwargs)
