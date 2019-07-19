@@ -25,15 +25,8 @@ from accel import *
 
 class ADXL362(Module):
     def __init__(self, platform):
-        pads  = platform.request("spi", 0)
+        pads  = platform.request("spi_slave", 0)
         led0  = platform.request("user_led", 0)
-        led1  = platform.request("user_led", 1)
-        led2  = platform.request("user_led", 2)
-        led3  = platform.request("user_led", 3)
-        led4  = platform.request("user_led", 4)
-        led5  = platform.request("user_led", 5)
-        led6  = platform.request("user_led", 6)
-        led7  = platform.request("user_led", 7)        
         clk12 = platform.request("clk12")
         self.clock_domains.cd_sys = ClockDomain()
         self.reset = Signal()
@@ -70,22 +63,16 @@ class ADXL362(Module):
         self.specials += AsyncResetSynchronizer(self.cd_por, self.reset)
 
         # Integrate accel core
-        core = SpiSlave()      
+        core = SpiSlave()
         self.submodules += core
 
         self.comb += [
-            core.sck.eq(pads.sclk),
+            core.sck.eq(pads.sck),
             core.mosi.eq(pads.mosi),
             pads.miso.eq(core.miso),
             core.csn.eq(pads.csn),
-            led0.eq(core.led[0]),
-            led1.eq(core.led[1]),
-            led2.eq(core.led[2]),
-            led3.eq(core.led[3]),
-            led4.eq(core.led[4]),
-            led5.eq(core.led[5]),
-            led6.eq(core.led[6]),
-            led7.eq(core.led[7]),
+            led0.eq(core.led),
+
         ]
 
 platform = ice40hx8k.Platform()
