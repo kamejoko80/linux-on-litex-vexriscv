@@ -177,7 +177,8 @@ class SpiMaster(Module, AutoCSR):
         sclk_inv = Signal()
 
         self.comb += [
-           pads.sclk.eq(~sclk_inv) 
+           # pads.sclk.eq(~sclk_inv) # Need to invert to test with ADC128S102
+           pads.sclk.eq(sclk_inv)
         ]
 
         self.specials += [

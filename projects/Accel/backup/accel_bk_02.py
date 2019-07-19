@@ -56,18 +56,18 @@ class EdgeDetector(Module):
         self.f   = Signal() # Falling edge detect
         self.csn = Signal() # SPI csn pin
         self.cnt = Signal(2)
-
+        
         self.comb += [
             self.r.eq(self.cnt == 1),
             self.f.eq(self.cnt == 2),
         ]
-
+        
         self.sync += [
             If(self.csn,
                self.cnt.eq(0),
             ).Else(
                self.cnt[1].eq(self.cnt[0]),
-               self.cnt[0].eq(self.i),
+               self.cnt[0].eq(self.i),                
             )
         ]
 
@@ -201,26 +201,28 @@ class SpiSlave(Module):
         self.sck  = Signal()  # SCK pin input
         self.mosi = Signal()  # MOSI pin input
         self.miso = Signal()  # MISO pin output
-        self.csn  = Signal()  # CSN pin input
-
+        self.csn  = Signal()  # CSN pin input   
+        
         # Led debug
-        self.led  = Signal(1, reset=1)
-
+        self.led  = Signal(8)
+        
         # Internal core signals
-        self.rxc  = Signal()  # Data RX complete (wire)
+        self.rxc  = Signal()  # Data RX complete
+        self.txr  = Signal()  # Data TX request
         self.rxd  = Signal(8) # RX data
-
+        self.txd  = Signal(8) # TX data
+      
         # Misc signals
         self.sck_cnt  = Signal(2) # SCK edge detect counter
-        self.sck_r    = Signal()  # SCK rising edge detect signal (wire)
-        self.sck_f    = Signal()  # SCK falling edge detect signal (wire)
+        self.sck_r    = Signal()  # SCK rising edge detect signal
+        self.sck_f    = Signal()  # SCK falling edge detect signal         
         self.csn_cnt  = Signal(2) # CSN edge detect counter
-        self.csn_f    = Signal()  # SCK falling edge detect signal (wire)
-        self.mosi_cnt = Signal(2) # MOSI edge detect counter
+        self.csn_f    = Signal()  # SCK falling edge detect signal
+        self.mosi_cnt = Signal(2) # MOSI edge detect counter      
         self.bitcnt   = Signal(3) # Bit count
-        self.mosi_s   = Signal()  # MOSI sample (wire)
-        self.tx_buf   = Signal(8) # TX data buffer
-
+        self.mosi_s   = Signal()  # MOSI sample
+        self.tx_buf   = Signal(8) # TX data buffer 
+        
         # Register set internal bus, signals
         self.bus_addr = Signal(8)
         self.bus_dw   = Signal(8)
@@ -231,7 +233,20 @@ class SpiSlave(Module):
         # CMD & ADDR storage
         self.str_cmd  = Signal(8)
         self.str_addr = Signal(8)
+        
+        # Need debouncer to get better rising/falling detection
+        sck_db  = Debouncer(cycles=1)
+        mosi_db = Debouncer(cycles=1)
+        csn_db  = Debouncer(cycles=1)
+        self.submodules += sck_db, mosi_db, csn_db
 
+        # Connect to debouncer I/O
+        self.comb += [
+            sck_db.i.eq(self.sck),
+            mosi_db.i.eq(self.mosi),
+            csn_db.i.eq(self.csn),
+        ]        
+        
         # Connect to register set
         reg = RegisterArray()
         self.submodules += reg
@@ -243,19 +258,19 @@ class SpiSlave(Module):
             reg.dw.eq(self.bus_dw),
             self.bus_dr.eq(reg.dr),
         ]
-
+        
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
-        self.submodules += fsm
-
+        self.submodules += fsm        
+        
         # To make sure we can reset the FSM properly
         self.comb += [
             fsm.reset.eq(self.csn),
         ]
-
+        
         # FSM behavior description
         fsm.act("IDLE",
-            If(~self.csn,
+            If(self.csn_f,
                 NextState("CMD_PHASE"),
             )
         )
@@ -264,7 +279,7 @@ class SpiSlave(Module):
                 NextValue(self.str_cmd, self.rxd),
                 NextState("CMD_DECODE"),
             )
-        )
+        )        
         fsm.act("CMD_DECODE",
             If(self.str_cmd == 0x0A, # Reg write
                 NextState("ADDR_PHASE"),
@@ -273,16 +288,16 @@ class SpiSlave(Module):
             ).Elif(self.str_cmd == 0x0D, # FIFO read
                 NextState("READ_FIFO"),
             ).Else(
-                NextValue(self.led, 0),
+                NextValue(self.led, 0xFF), 
                 NextState("IDLE"),
             )
-        )
+        )        
         fsm.act("ADDR_PHASE",
             If(self.rxc,
                 NextValue(self.str_addr, self.rxd),
                 NextState("DETERMINE_REG_ACCESS"),
             )
-        )
+        )        
         fsm.act("DETERMINE_REG_ACCESS",
             If(self.str_cmd == 0x0A, # Reg write
                 NextState("REG_VALUE_SHIFTIN"),
@@ -293,7 +308,7 @@ class SpiSlave(Module):
             ).Else(
                 NextState("IDLE"),
             )
-        )
+        )        
         fsm.act("REG_VALUE_SHIFTIN",
             If(self.rxc,
                 NextValue(self.bus_addr, self.str_addr),
@@ -301,7 +316,7 @@ class SpiSlave(Module):
                 NextValue(self.bus_w, 1),
                 NextState("REG_WRITE_STROBE"),
             )
-        )
+        )        
         fsm.act("REG_WRITE_STROBE",
             NextState("REG_WRITE_VALUE"),
         )
@@ -316,12 +331,12 @@ class SpiSlave(Module):
             NextValue(self.tx_buf, self.bus_dr),
             NextValue(self.bus_r, 0),
             NextState("SHIFTING_OUT"),
-        )
+        )        
         fsm.act("SHIFTING_OUT",
             If(self.rxc,
                 NextState("SHIFT_OUT_DONE"),
             )
-        )
+        )        
         fsm.act("SHIFT_OUT_DONE",
             If(self.bus_addr < 0x2D,
                 NextValue(self.bus_addr, self.bus_addr + 1),
@@ -333,33 +348,33 @@ class SpiSlave(Module):
         )
         fsm.act("READ_FIFO",
 
-        )
-
+        )        
+        
         # Edge detect signal combinatorial
         self.comb += [
             self.sck_r.eq(self.sck_cnt == 1),
             self.sck_f.eq(self.sck_cnt == 2),
-            self.csn_f.eq(self.csn_cnt == 2),
+            self.csn_f.eq(self.csn_cnt == 2),            
         ]
-
+        
         # MOSI data sampling
         self.comb += [
             self.mosi_s.eq(self.mosi_cnt[1]),
         ]
-
+        
         # Edge detector behavior description
         self.sync += [
             self.sck_cnt[1].eq(self.sck_cnt[0]),
-            self.sck_cnt[0].eq(self.sck),
+            self.sck_cnt[0].eq(sck_db.o),
             self.csn_cnt[1].eq(self.csn_cnt[0]),
-            self.csn_cnt[0].eq(self.csn),
+            self.csn_cnt[0].eq(self.csn),                
             self.mosi_cnt[1].eq(self.mosi_cnt[0]),
-            self.mosi_cnt[0].eq(self.mosi),
+            self.mosi_cnt[0].eq(mosi_db.o),
         ]
 
         # RX data behavior description
         self.sync += [
-            If(self.csn_f,
+            If(self.csn,
                 self.bitcnt.eq(0),
                 self.rxd.eq(0),
             ).Elif(self.sck_f,
@@ -368,25 +383,30 @@ class SpiSlave(Module):
                 self.rxd[0].eq(self.mosi_s),
             )
         ]
-
+            
         # RX completed notification
-        self.sync += [
+        self.sync += [       
             self.rxc.eq(~self.csn & self.sck_f & (self.bitcnt == 7)),
         ]
-
+        
         # TX data behavior description
         self.sync += [
-            If(self.csn_f,
+            If(self.csn,
                 self.tx_buf.eq(0),
             ).Elif(self.sck_f,
                 self.tx_buf.eq(self.tx_buf<<1),
-            )
-        ]
-
+            )            
+        ]        
+        
         # MISO output behavior description
         self.comb += [
             self.miso.eq(self.tx_buf[7]),
         ]
+        
+        # TX data request notification
+        self.comb += [
+            self.txr.eq(~self.csn & (self.bitcnt == 0)),    
+        ]        
 
 def SpiSlaveTestBench(dut):
     cnt1 = 0
@@ -408,13 +428,13 @@ def SpiSlaveTestBench(dut):
 
         if cycle >= 0 and cycle < 2:
             yield dut.csn.eq(1)
-
+            
         if cycle > 30 and cycle < 32:
             yield dut.csn.eq(0)
-            yield dut.txd.eq(0xA5)
+            yield dut.txd.eq(0xA5)  
 
-        yield
-
+        yield        
+        
 def ReadRegTestBench(dut):
     t = 3  # Number of transfer byte on si line
     u = 5  # Number of total shifted byte
@@ -441,8 +461,8 @@ def ReadRegTestBench(dut):
             yield dut.csn.eq(1)
 
         if cycle > 0 and cycle < 3:
-            yield dut.csn.eq(1)
-
+            yield dut.csn.eq(1)            
+            
         if cycle > 3 and cycle < 5:
             yield dut.csn.eq(0)
 
@@ -505,7 +525,7 @@ def WriteReadRegTestBench(dut):
         #################### Start new write phase ##################
         if cycle >= 0 and cycle < 2:
             yield dut.csn.eq(1)
-
+            
         if cycle > 3 and cycle < 5:
             yield dut.csn.eq(0)
 

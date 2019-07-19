@@ -26,12 +26,13 @@ from accel import *
 class ADXL362(Module):
     def __init__(self, platform):
         pads  = platform.request("spi", 0)
+        led   = platform.request("led0", 0)
         # clock source request
         clk50 = platform.request("clk50")
 
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_por = ClockDomain(reset_less=True)        
-        
+        self.clock_domains.cd_por = ClockDomain(reset_less=True)
+
         ###
         self.cd_sys.clk.attr.add("keep")
         self.cd_por.clk.attr.add("keep")
@@ -50,7 +51,7 @@ class ADXL362(Module):
                 p_BANDWIDTH_TYPE="AUTO",
                 p_CLK0_DIVIDE_BY=1,
                 p_CLK0_DUTY_CYCLE=50e0,
-                p_CLK0_MULTIPLY_BY=2,
+                p_CLK0_MULTIPLY_BY=4,
                 p_CLK0_PHASE_SHIFT="0",
                 p_COMPENSATE_CLOCK="CLK0",
                 p_INCLK0_INPUT_FREQUENCY=20000e0,
@@ -65,8 +66,10 @@ class ADXL362(Module):
                 i_PLLENA=1,
             )
 
+        #self.comb += self.cd_sys.clk.eq(clk50)
+
         # Integrate accel core
-        core = SpiSlave()      
+        core = SpiSlave()
         self.submodules += core
 
         self.comb += [
@@ -74,6 +77,7 @@ class ADXL362(Module):
             core.mosi.eq(pads.mosi),
             pads.miso.eq(core.miso),
             core.csn.eq(pads.csn),
+            led.eq(core.led),
         ]
 
 platform = qmatech.Platform()

@@ -10,6 +10,7 @@ from litex.soc.integration.soc_core import mem_decoder
 from litex.soc.cores.spi_flash import SpiFlashSingle
 
 from periphs.misc import *
+from periphs.spi_slave import *
 
 # SoCCustom -----------------------------------------------------------------------------------------
 
@@ -31,12 +32,12 @@ def SoCICE40HX(soc_cls, **kwargs):
             "csr":          0xf0000000,
         }
 
-        def __init__(self, **kwargs):      
-            soc_cls.__init__(self, cpu_type="vexriscv", cpu_reset_address=self.mem_map["rom"], cpu_variant="lite", **kwargs)
+        def __init__(self, **kwargs):
+            soc_cls.__init__(self, cpu_type="vexriscv", cpu_reset_address=self.mem_map["rom"], cpu_variant="min", **kwargs)
 
             # get platform object
-            platform = self.platform 
-            cpu_reset_address = self.mem_map["spiflash"] + platform.gateware_size 
+            platform = self.platform
+            cpu_reset_address = self.mem_map["spiflash"] + platform.gateware_size
 
             # SPI flash peripheral
             self.submodules.spiflash = SpiFlashSingle(platform.request("spiflash"),
@@ -60,12 +61,15 @@ def SoCICE40HX(soc_cls, **kwargs):
                 # Leave a grace area- possible one-by-off bug in add_memory_region?
                 # Possible fix: addr < origin + length - 1
                 platform.spiflash_total_size - (self.flash_boot_address - self.mem_map["spiflash"]) - 0x100)
-                
+
             # Integrate SPI master
             self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
             self.add_csr("spi_master", 10, allow_user_defined=True)
             self.add_interrupt("spi_master", 6, allow_user_defined=True)
             self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
-            spi_master.add_source(self.platform)                
+            spi_master.add_source(self.platform)
+
+            # Custome SPI slave
+            self.submodules.spi_slave = spi_slave = SpiSlave(self.platform.request("spi_slave", 0))
 
     return _SoCLinux(**kwargs)

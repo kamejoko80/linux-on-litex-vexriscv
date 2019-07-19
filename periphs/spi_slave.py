@@ -56,18 +56,18 @@ class EdgeDetector(Module):
         self.f   = Signal() # Falling edge detect
         self.csn = Signal() # SPI csn pin
         self.cnt = Signal(2)
-        
+
         self.comb += [
             self.r.eq(self.cnt == 1),
             self.f.eq(self.cnt == 2),
         ]
-        
+
         self.sync += [
             If(self.csn,
                self.cnt.eq(0),
             ).Else(
                self.cnt[1].eq(self.cnt[0]),
-               self.cnt[0].eq(self.i),                
+               self.cnt[0].eq(self.i),
             )
         ]
 
@@ -109,87 +109,88 @@ class RegisterArray(Module):
         self.reg37  = Signal(8, reset=0x00) # TIME_INACT_L   [RW]
         self.reg38  = Signal(8, reset=0x00) # TIME_INACT_H   [RW]
         self.reg39  = Signal(8, reset=0x00) # ACT_INACT_CTL  [RW]
-        self.reg40  = Signal(8, reset=0x00) # FIFO_CONTRO    [RW]
-        self.reg41  = Signal(8, reset=0x00) # FIFO_SAMPLES   [RW]
+        self.reg40  = Signal(8, reset=0x00) # FIFO_CONTROL   [RW]
+        self.reg41  = Signal(8, reset=0x80) # FIFO_SAMPLES   [RW]
         self.reg42  = Signal(8, reset=0x00) # INTMAP1        [RW]
         self.reg43  = Signal(8, reset=0x00) # INTMAP2        [RW]
         self.reg44  = Signal(8, reset=0x13) # FILTER_CTL     [RW]
         self.reg45  = Signal(8, reset=0x00) # POWER_CTL      [RW]
-        self.reg46  = Signal(8, reset=0x00) # SELF_TEST      [RW]
+       #self.reg46  = Signal(8, reset=0x00) # SELF_TEST      [RW]
 
         self.sync += [
             If(self.r,
                 Case(self.addr, {
-                    0:  self.dr.eq( self.reg0),
-                    1:  self.dr.eq( self.reg1),
-                    2:  self.dr.eq( self.reg2),
-                    3:  self.dr.eq( self.reg3),
+                    0:  self.dr.eq( self.reg0), # DEVID_AD       [R]
+                    1:  self.dr.eq( self.reg1), # DEVID_MST      [R]
+                    2:  self.dr.eq( self.reg2), # PARTID         [R]
+                    3:  self.dr.eq( self.reg3), # REVID          [R]
 
-                    8:  self.dr.eq( self.reg8),
-                    9:  self.dr.eq( self.reg9),
-                    10: self.dr.eq(self.reg10),
-                    11: self.dr.eq(self.reg11),
-                    12: self.dr.eq(self.reg12),
-                    13: self.dr.eq(self.reg13),
-                    14: self.dr.eq(self.reg14),
-                    15: self.dr.eq(self.reg15),
-                    16: self.dr.eq(self.reg16),
-                    17: self.dr.eq(self.reg17),
-                    18: self.dr.eq(self.reg18),
-                    19: self.dr.eq(self.reg19),
-                    20: self.dr.eq(self.reg20),
-                    21: self.dr.eq(self.reg21),
+                    8:  self.dr.eq( self.reg8), # XDATA          [R]
+                    9:  self.dr.eq( self.reg9), # YDATA          [R]
+                    10: self.dr.eq(self.reg10), # ZDATA          [R]
+                    11: self.dr.eq(self.reg11), # STATUS         [R]
+                    12: self.dr.eq(self.reg12), # FIFO_ENTRIES_L [R]
+                    13: self.dr.eq(self.reg13), # FIFO_ENTRIES_H [R]
+                    14: self.dr.eq(self.reg14), # XDATA_L        [R]
+                    15: self.dr.eq(self.reg15), # XDATA_H        [R]
+                    16: self.dr.eq(self.reg16), # YDATA_L        [R]
+                    17: self.dr.eq(self.reg17), # YDATA_H        [R]
+                    18: self.dr.eq(self.reg18), # ZDATA_L        [R]
+                    19: self.dr.eq(self.reg19), # ZDATA_H        [R]
+                    20: self.dr.eq(self.reg20), # TEMP_L         [R]
+                    21: self.dr.eq(self.reg21), # TEMP_H         [R]
 
-                    32: self.dr.eq(self.reg32),
-                    33: self.dr.eq(self.reg33),
-                    34: self.dr.eq(self.reg34),
-                    35: self.dr.eq(self.reg35),
-                    36: self.dr.eq(self.reg36),
-                    37: self.dr.eq(self.reg37),
-                    38: self.dr.eq(self.reg38),
-                    39: self.dr.eq(self.reg39),
-                    40: self.dr.eq(self.reg40),
-                    41: self.dr.eq(self.reg41),
-                    42: self.dr.eq(self.reg42),
-                    43: self.dr.eq(self.reg43),
-                    44: self.dr.eq(self.reg44),
-                    45: self.dr.eq(self.reg45),
-                    46: self.dr.eq(self.reg46),
+                   #31: self.dr.eq(self.reg31), # SOFT_RESET     [W]
+                    32: self.dr.eq(self.reg32), # THRESH_ACT_L   [RW]
+                    33: self.dr.eq(self.reg33), # THRESH_ACT_H   [RW]
+                    34: self.dr.eq(self.reg34), # TIME_ACT       [RW]
+                    35: self.dr.eq(self.reg35), # THRESH_INACT_L [RW]
+                    36: self.dr.eq(self.reg36), # THRESH_INACT_H [RW]
+                    37: self.dr.eq(self.reg37), # TIME_INACT_L   [RW]
+                    38: self.dr.eq(self.reg38), # TIME_INACT_H   [RW]
+                    39: self.dr.eq(self.reg39), # ACT_INACT_CTL  [RW]
+                    40: self.dr.eq(self.reg40), # FIFO_CONTROL   [RW]
+                    41: self.dr.eq(self.reg41), # FIFO_SAMPLES   [RW]
+                    42: self.dr.eq(self.reg42), # INTMAP1        [RW]
+                    43: self.dr.eq(self.reg43), # INTMAP2        [RW]
+                    44: self.dr.eq(self.reg44), # FILTER_CTL     [RW]
+                    45: self.dr.eq(self.reg45), # POWER_CTL      [RW]
+                   #46: self.dr.eq(self.reg46), # SELF_TEST      [RW]
              "default": self.dr.eq(0),
                 })
             ).Elif(self.w,
                 Case(self.addr, {
-                    8:  self.reg8.eq( self.dw),
-                    9:  self.reg9.eq( self.dw),
-                    10: self.reg10.eq(self.dw),
-                    11: self.reg11.eq(self.dw),
-                    12: self.reg12.eq(self.dw),
-                    13: self.reg13.eq(self.dw),
-                    14: self.reg14.eq(self.dw),
-                    15: self.reg15.eq(self.dw),
-                    16: self.reg16.eq(self.dw),
-                    17: self.reg17.eq(self.dw),
-                    18: self.reg18.eq(self.dw),
-                    19: self.reg19.eq(self.dw),
-                    20: self.reg20.eq(self.dw),
-                    21: self.reg21.eq(self.dw),
+                   #8:  self.reg8.eq( self.dw), # XDATA          [R]
+                   #9:  self.reg9.eq( self.dw), # YDATA          [R]
+                   #10: self.reg10.eq(self.dw), # ZDATA          [R]
+                   #11: self.reg11.eq(self.dw), # STATUS         [R]
+                   #12: self.reg12.eq(self.dw), # FIFO_ENTRIES_L [R]
+                   #13: self.reg13.eq(self.dw), # FIFO_ENTRIES_H [R]
+                   #14: self.reg14.eq(self.dw), # XDATA_L        [R]
+                   #15: self.reg15.eq(self.dw), # XDATA_H        [R]
+                   #16: self.reg16.eq(self.dw), # YDATA_L        [R]
+                   #17: self.reg17.eq(self.dw), # YDATA_H        [R]
+                   #18: self.reg18.eq(self.dw), # ZDATA_L        [R]
+                   #19: self.reg19.eq(self.dw), # ZDATA_H        [R]
+                   #20: self.reg20.eq(self.dw), # TEMP_L         [R]
+                   #21: self.reg21.eq(self.dw), # TEMP_H         [R]
 
-                    31: self.reg31.eq(self.dw),
-                    32: self.reg32.eq(self.dw),
-                    33: self.reg33.eq(self.dw),
-                    34: self.reg34.eq(self.dw),
-                    35: self.reg35.eq(self.dw),
-                    36: self.reg36.eq(self.dw),
-                    37: self.reg37.eq(self.dw),
-                    38: self.reg38.eq(self.dw),
-                    39: self.reg39.eq(self.dw),
-                    40: self.reg40.eq(self.dw),
-                    41: self.reg41.eq(self.dw),
-                    42: self.reg42.eq(self.dw),
-                    43: self.reg43.eq(self.dw),
-                    44: self.reg44.eq(self.dw),
-                    45: self.reg45.eq(self.dw),
-                    46: self.reg46.eq(self.dw),
+                    31: self.reg31.eq(self.dw), # SOFT_RESET     [W]
+                    32: self.reg32.eq(self.dw), # THRESH_ACT_L   [RW]
+                    33: self.reg33.eq(self.dw), # THRESH_ACT_H   [RW]
+                    34: self.reg34.eq(self.dw), # TIME_ACT       [RW]
+                    35: self.reg35.eq(self.dw), # THRESH_INACT_L [RW]
+                    36: self.reg36.eq(self.dw), # THRESH_INACT_H [RW]
+                    37: self.reg37.eq(self.dw), # TIME_INACT_L   [RW]
+                    38: self.reg38.eq(self.dw), # TIME_INACT_H   [RW]
+                    39: self.reg39.eq(self.dw), # ACT_INACT_CTL  [RW]
+                    40: self.reg40.eq(self.dw), # FIFO_CONTROL   [RW]
+                    41: self.reg41.eq(self.dw), # FIFO_SAMPLES   [RW]
+                    42: self.reg42.eq(self.dw), # INTMAP1        [RW]
+                    43: self.reg43.eq(self.dw), # INTMAP2        [RW]
+                    44: self.reg44.eq(self.dw), # FILTER_CTL     [RW]
+                    45: self.reg45.eq(self.dw), # POWER_CTL      [RW]
+                   #46: self.reg46.eq(self.dw), # SELF_TEST      [RW]
                 })
             )
         ]
@@ -203,25 +204,23 @@ class SpiSlave(Module):
         #self.csn  = Signal()  # CSN pin input   
         
         # Led debug
-        self.led  = Signal(8)
-        
+        self.led  = Signal(1, reset=1)
+
         # Internal core signals
-        self.rxc  = Signal()  # Data RX complete
-        self.txr  = Signal()  # Data TX request
+        self.rxc  = Signal()  # Data RX complete (wire)
         self.rxd  = Signal(8) # RX data
-        self.txd  = Signal(8) # TX data
-      
+
         # Misc signals
         self.sck_cnt  = Signal(2) # SCK edge detect counter
-        self.sck_r    = Signal()  # SCK rising edge detect signal
-        self.sck_f    = Signal()  # SCK falling edge detect signal         
+        self.sck_r    = Signal()  # SCK rising edge detect signal (wire)
+        self.sck_f    = Signal()  # SCK falling edge detect signal (wire)
         self.csn_cnt  = Signal(2) # CSN edge detect counter
-        self.csn_f    = Signal()  # SCK falling edge detect signal
-        self.mosi_cnt = Signal(2) # MOSI edge detect counter      
+        self.csn_f    = Signal()  # SCK falling edge detect signal (wire)
+        self.mosi_cnt = Signal(2) # MOSI edge detect counter
         self.bitcnt   = Signal(3) # Bit count
-        self.mosi_s   = Signal()  # MOSI sample
-        self.tx_buf   = Signal(8) # TX data buffer 
-        
+        self.mosi_s   = Signal()  # MOSI sample (wire)
+        self.tx_buf   = Signal(8) # TX data buffer
+
         # Register set internal bus, signals
         self.bus_addr = Signal(8)
         self.bus_dw   = Signal(8)
@@ -232,20 +231,7 @@ class SpiSlave(Module):
         # CMD & ADDR storage
         self.str_cmd  = Signal(8)
         self.str_addr = Signal(8)
-        
-        # Need debouncer to get better rising/falling detection
-        sck_db  = Debouncer(cycles=1)
-        mosi_db = Debouncer(cycles=1)
-        csn_db  = Debouncer(cycles=1)
-        self.submodules += sck_db, mosi_db, csn_db
 
-        # Connect to debouncer I/O
-        self.comb += [
-            sck_db.i.eq(pads.sck),
-            mosi_db.i.eq(pads.mosi),
-            csn_db.i.eq(pads.csn),
-        ]        
-        
         # Connect to register set
         reg = RegisterArray()
         self.submodules += reg
@@ -257,19 +243,19 @@ class SpiSlave(Module):
             reg.dw.eq(self.bus_dw),
             self.bus_dr.eq(reg.dr),
         ]
-        
+
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
-        self.submodules += fsm        
-        
+        self.submodules += fsm
+
         # To make sure we can reset the FSM properly
         self.comb += [
             fsm.reset.eq(pads.csn),
         ]
-        
+
         # FSM behavior description
         fsm.act("IDLE",
-            If(self.csn_f,
+            If(~pads.csn,
                 NextState("CMD_PHASE"),
             )
         )
@@ -278,7 +264,7 @@ class SpiSlave(Module):
                 NextValue(self.str_cmd, self.rxd),
                 NextState("CMD_DECODE"),
             )
-        )        
+        )
         fsm.act("CMD_DECODE",
             If(self.str_cmd == 0x0A, # Reg write
                 NextState("ADDR_PHASE"),
@@ -287,16 +273,16 @@ class SpiSlave(Module):
             ).Elif(self.str_cmd == 0x0D, # FIFO read
                 NextState("READ_FIFO"),
             ).Else(
-                NextValue(self.led, 0xFF), 
+                NextValue(self.led, 0),
                 NextState("IDLE"),
             )
-        )        
+        )
         fsm.act("ADDR_PHASE",
             If(self.rxc,
                 NextValue(self.str_addr, self.rxd),
                 NextState("DETERMINE_REG_ACCESS"),
             )
-        )        
+        )
         fsm.act("DETERMINE_REG_ACCESS",
             If(self.str_cmd == 0x0A, # Reg write
                 NextState("REG_VALUE_SHIFTIN"),
@@ -307,7 +293,7 @@ class SpiSlave(Module):
             ).Else(
                 NextState("IDLE"),
             )
-        )        
+        )
         fsm.act("REG_VALUE_SHIFTIN",
             If(self.rxc,
                 NextValue(self.bus_addr, self.str_addr),
@@ -315,7 +301,7 @@ class SpiSlave(Module):
                 NextValue(self.bus_w, 1),
                 NextState("REG_WRITE_STROBE"),
             )
-        )        
+        )
         fsm.act("REG_WRITE_STROBE",
             NextState("REG_WRITE_VALUE"),
         )
@@ -330,12 +316,12 @@ class SpiSlave(Module):
             NextValue(self.tx_buf, self.bus_dr),
             NextValue(self.bus_r, 0),
             NextState("SHIFTING_OUT"),
-        )        
+        )
         fsm.act("SHIFTING_OUT",
             If(self.rxc,
                 NextState("SHIFT_OUT_DONE"),
             )
-        )        
+        )
         fsm.act("SHIFT_OUT_DONE",
             If(self.bus_addr < 0x2D,
                 NextValue(self.bus_addr, self.bus_addr + 1),
@@ -347,33 +333,33 @@ class SpiSlave(Module):
         )
         fsm.act("READ_FIFO",
 
-        )        
-        
+        )
+
         # Edge detect signal combinatorial
         self.comb += [
             self.sck_r.eq(self.sck_cnt == 1),
             self.sck_f.eq(self.sck_cnt == 2),
-            self.csn_f.eq(self.csn_cnt == 2),            
+            self.csn_f.eq(self.csn_cnt == 2),
         ]
-        
+
         # MOSI data sampling
         self.comb += [
             self.mosi_s.eq(self.mosi_cnt[1]),
         ]
-        
+
         # Edge detector behavior description
         self.sync += [
             self.sck_cnt[1].eq(self.sck_cnt[0]),
-            self.sck_cnt[0].eq(sck_db.o),
+            self.sck_cnt[0].eq(pads.sck),
             self.csn_cnt[1].eq(self.csn_cnt[0]),
-            self.csn_cnt[0].eq(pads.csn),                
+            self.csn_cnt[0].eq(pads.csn),
             self.mosi_cnt[1].eq(self.mosi_cnt[0]),
-            self.mosi_cnt[0].eq(mosi_db.o),
+            self.mosi_cnt[0].eq(pads.mosi),
         ]
 
         # RX data behavior description
         self.sync += [
-            If(pads.csn,
+            If(self.csn_f,
                 self.bitcnt.eq(0),
                 self.rxd.eq(0),
             ).Elif(self.sck_f,
@@ -382,29 +368,24 @@ class SpiSlave(Module):
                 self.rxd[0].eq(self.mosi_s),
             )
         ]
-            
+
         # RX completed notification
         self.sync += [       
             self.rxc.eq(~pads.csn & self.sck_f & (self.bitcnt == 7)),
         ]
-        
+
         # TX data behavior description
         self.sync += [
-            If(pads.csn,
+            If(self.csn_f,
                 self.tx_buf.eq(0),
             ).Elif(self.sck_f,
                 self.tx_buf.eq(self.tx_buf<<1),
-            )            
-        ]        
-        
+            )
+        ]
+
         # MISO output behavior description
         self.comb += [
             pads.miso.eq(self.tx_buf[7]),
-        ]
-        
-        # TX data request notification
-        self.comb += [
-            self.txr.eq(~pads.csn & (self.bitcnt == 0)),    
         ]        
 
 def SpiSlaveTestBench(dut):
@@ -427,13 +408,13 @@ def SpiSlaveTestBench(dut):
 
         if cycle >= 0 and cycle < 2:
             yield dut.csn.eq(1)
-            
+
         if cycle > 30 and cycle < 32:
             yield dut.csn.eq(0)
-            yield dut.txd.eq(0xA5)  
+            yield dut.txd.eq(0xA5)
 
-        yield        
-        
+        yield
+
 def ReadRegTestBench(dut):
     t = 3  # Number of transfer byte on si line
     u = 5  # Number of total shifted byte
@@ -460,8 +441,8 @@ def ReadRegTestBench(dut):
             yield dut.csn.eq(1)
 
         if cycle > 0 and cycle < 3:
-            yield dut.csn.eq(1)            
-            
+            yield dut.csn.eq(1)
+
         if cycle > 3 and cycle < 5:
             yield dut.csn.eq(0)
 
@@ -524,7 +505,7 @@ def WriteReadRegTestBench(dut):
         #################### Start new write phase ##################
         if cycle >= 0 and cycle < 2:
             yield dut.csn.eq(1)
-            
+
         if cycle > 3 and cycle < 5:
             yield dut.csn.eq(0)
 
