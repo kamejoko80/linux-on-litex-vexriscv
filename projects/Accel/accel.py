@@ -19,6 +19,8 @@ import os
 from migen import *
 from migen.fhdl import verilog
 from migen.genlib.misc import WaitTimer
+from migen.genlib.fifo import SyncFIFOBuffered
+
 from random import randrange
 
 class Debouncer(Module):
@@ -228,6 +230,12 @@ class SpiSlave(Module):
         self.bus_r    = Signal()
         self.bus_w    = Signal()
 
+        # FIFO data input signals
+        self.fifo_din = Signal(8)
+        self.fifo_level = Signal(max=10) # max=depth+2
+        self.fifo_writeable = Signal()
+        self.fifo_we = Signal()
+
         # CMD & ADDR storage
         self.str_cmd  = Signal(8)
         self.str_addr = Signal(8)
@@ -242,6 +250,18 @@ class SpiSlave(Module):
             reg.w.eq(self.bus_w),
             reg.dw.eq(self.bus_dw),
             self.bus_dr.eq(reg.dr),
+        ]
+
+        # Connect to the FIFO buffer
+        fifo = SyncFIFOBuffered(width=8, depth=512)
+        self.submodules += fifo
+
+        # Connnect fifo buffer input parts
+        self.comb += [
+            fifo.din.eq(self.fifo_din),
+            fifo.we.eq(self.fifo_we),
+            self.fifo_writeable.eq(fifo.writable),
+            self.fifo_level.eq(fifo.level),
         ]
 
         # Submodule FSM handles data in/out activities
@@ -332,7 +352,22 @@ class SpiSlave(Module):
             )
         )
         fsm.act("READ_FIFO",
-
+            If(fifo.readable,
+                NextValue(fifo.re, 1),
+                NextState("READ_FIFO_STROBE"),
+            ).Else( #FIFO is empty
+                NextState("IDLE"),
+            )
+        )
+        fsm.act("READ_FIFO_STROBE",
+            NextValue(fifo.re, 0),
+            NextValue(self.tx_buf, fifo.dout),
+            NextState("FIFO_SHIFTING_OUT"),
+        )
+        fsm.act("FIFO_SHIFTING_OUT",
+            If(self.rxc,
+                NextState("READ_FIFO"),
+            )
         )
 
         # Edge detect signal combinatorial
@@ -387,6 +422,44 @@ class SpiSlave(Module):
         self.comb += [
             self.miso.eq(self.tx_buf[7]),
         ]
+
+class SyncFIFOTest(Module):
+    def __init__(self, width, depth):
+        self.din = Signal(width)
+        self.dout = Signal(width)
+        self.level = Signal(max=depth+2)
+        self.writable = Signal()
+        self.readable = Signal()
+        self.we = Signal()
+        self.re = Signal()
+
+        fifo = SyncFIFOBuffered(width, depth)
+        self.submodules += fifo
+
+        self.comb += [
+            fifo.din.eq(self.din),
+            self.dout.eq(fifo.dout),
+            self.level.eq(fifo.level),
+            self.writable.eq(fifo.writable),
+            self.readable.eq(fifo.readable),
+            fifo.we.eq(self.we),
+            fifo.re.eq(self.re),
+        ]
+
+class UART(Module):
+    # freg  : sys_clk frequency
+    # baud  : Uart baud rate
+    # ratio : Over sampling ratio
+    def __init__(self, freq, baud, ratio):
+        self.txd = Signal()
+        self.rxd = Signal()
+        self.din = Signal(8)
+        self.dout = Signal(8)
+        self.writeable = Signal() # Assert indicates din can be written
+        self.readable = Signal()  # Assert inditated dout can be read
+        self.prescaler = Signal(max=freg/(baud*ratio))
+        self.count = Signal(max=ratio)
+        
 
 def SpiSlaveTestBench(dut):
     cnt1 = 0
@@ -555,11 +628,104 @@ def WriteReadRegTestBench(dut):
 
         yield
 
+def SyncFIFOTestTestBench(dut):
+
+    for cycle in range(1000):
+
+        if cycle == 3:
+            yield dut.din.eq(0xA3)
+
+        if cycle == 4:
+            yield dut.din.eq(0xA4)
+
+        if cycle == 5:
+            yield dut.din.eq(0xA5)
+
+        if cycle == 6:
+            yield dut.din.eq(0x00)
+
+        if cycle == 3:
+            yield dut.we.eq(1)
+
+        if cycle == 5:
+            yield dut.we.eq(1)
+
+        if cycle == 6:
+            yield dut.we.eq(0)
+
+        if cycle > 7:
+            yield dut.re.eq(1)
+        else:
+            yield dut.re.eq(0)
+
+        yield
+
+def ReadFiFoTestBench(dut):
+    t = 1  # Number of transfer byte on si line
+    u = 5  # Number of total shifted byte
+    s = 10 # SCK toggle at cycle 10th
+    n = 10 # n cycles per sck toggle
+    i = 0
+    j = 0
+    cmd = 0x0D # Read FIFO
+
+    for cycle in range(1000):
+        
+        # Fill up the FIFO
+        if cycle == 2:
+            yield dut.fifo_din.eq(0xAA)
+            yield dut.fifo_we.eq(1)
+        
+        if cycle == 3:    
+            yield dut.fifo_din.eq(0xA5)
+            yield dut.fifo_we.eq(1)
+
+        if cycle == 4:
+            yield dut.fifo_din.eq(0x11)
+            yield dut.fifo_we.eq(1)
+            
+        if cycle == 5:
+            yield dut.fifo_din.eq(0)
+            yield dut.fifo_we.eq(0)            
+
+        # Generate si
+        if cycle == (s + j*n*2) and j < 2*8*t:
+            if (cmd & 0x80):
+                yield dut.mosi.eq(1)
+            else:
+                yield dut.mosi.eq(0)
+            cmd = cmd << 1
+            j = j + 1
+        elif j == 2*8*t:
+            yield dut.mosi.eq(0)
+
+        # Generate sck
+        if cycle == (s + n/2 + i*n) and i < 2*8*u:
+            yield dut.sck.eq(~dut.sck)
+            i = i + 1
+        elif i >= 2*8*u:
+            yield dut.csn.eq(1)
+
+        if cycle > 7 and cycle < 9:
+            yield dut.csn.eq(1)
+
+        if cycle > 9 and cycle < 11:
+            yield dut.csn.eq(0)
+
+        yield        
+        
 if __name__ == "__main__":
 
     dut = SpiSlave()
     #print(verilog.convert(SpiSlave()))
     #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
+    #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
     #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
+    run_simulation(dut, ReadFiFoTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
     #os.system("gtkwave SpiSlave.vcd")
+
+    #dut = SyncFIFOTest(width=8, depth=2)
+    #print(verilog.convert(SyncFIFOTest(width=8, depth=32)))
+    #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
+    #os.system("gtkwave SyncFIFOTest.vcd")
+
