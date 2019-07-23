@@ -445,7 +445,7 @@ class UART(Module):
     # freg  : sys_clk frequency
     # baud  : Uart baud rate
     # ratio : Over sampling ratio (choose 100)
-    def __init__(self, freq, baud, ratio):
+    def __init__(self, freq, baud, ratio=100):
         # Exteral interface signals
         self.txd = Signal(1, reset=1)
         self.rxd = Signal()
@@ -848,8 +848,8 @@ if __name__ == "__main__":
     #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
     #os.system("gtkwave SyncFIFOTest.vcd")
 
-    dut = UART(freq=50000000, baud=115200, ratio=100)
-    #print(verilog.convert(UART(freq=50000000, baud=115200, ratio=100)))
+    dut = UART(freq=50000000, baud=115200)
+    #print(verilog.convert(UART(freq=50000000, baud=115200)))
     run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
 
