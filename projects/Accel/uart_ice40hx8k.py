@@ -87,6 +87,14 @@ class ICE_UART(Module):
             led7.eq(uart.dout[7]),
         ]
 
+        # Echo implementation
+        self.sync +=[
+            If(uart.readable & uart.writeable,
+              uart.din.eq(uart.dout),
+              uart.tx_start.eq(1),
+            )
+        ]
+
 platform = ice40hx8k.Platform()
 dut = ICE_UART(platform)
 platform.build(dut)
