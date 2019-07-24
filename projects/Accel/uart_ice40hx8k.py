@@ -75,8 +75,8 @@ class ICE_UART(Module):
         self.submodules += uart
 
         self.comb += [
-            uart.rxd.eq(pads.rx),
-            pads.tx.eq(uart.txd),
+            uart.rx.eq(pads.rx),
+            pads.tx.eq(uart.tx),
             led0.eq(uart.dout[0]),
             led1.eq(uart.dout[1]),
             led2.eq(uart.dout[2]),
@@ -89,7 +89,7 @@ class ICE_UART(Module):
 
         # Echo implementation
         self.sync +=[
-            If(uart.readable & uart.writeable,
+            If(uart.readable & uart.writable,
               uart.din.eq(uart.dout),
               uart.tx_start.eq(1),
             )

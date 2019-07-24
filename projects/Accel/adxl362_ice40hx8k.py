@@ -72,7 +72,6 @@ class ADXL362(Module):
             pads.miso.eq(core.miso),
             core.csn.eq(pads.csn),
             led0.eq(core.led),
-
         ]
 
 platform = ice40hx8k.Platform()

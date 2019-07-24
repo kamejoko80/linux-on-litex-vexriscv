@@ -82,20 +82,20 @@ class RegisterArray(Module):
         self.reg2   = Signal(8, reset=0xF2) # PARTID         [R]
         self.reg3   = Signal(8, reset=0x01) # REVID          [R]
 
-        self.reg8   = Signal(8, reset=0x00) # XDATA          [R] internally writeable
-        self.reg9   = Signal(8, reset=0x00) # YDATA          [R] internally writeable
-        self.reg10  = Signal(8, reset=0x00) # ZDATA          [R] internally writeable
-        self.reg11  = Signal(8, reset=0x40) # STATUS         [R] internally writeable
-        self.reg12  = Signal(8, reset=0x00) # FIFO_ENTRIES_L [R] internally writeable
-        self.reg13  = Signal(8, reset=0x00) # FIFO_ENTRIES_H [R] internally writeable
-        self.reg14  = Signal(8, reset=0x00) # XDATA_L        [R] internally writeable
-        self.reg15  = Signal(8, reset=0x00) # XDATA_H        [R] internally writeable
-        self.reg16  = Signal(8, reset=0x00) # YDATA_L        [R] internally writeable
-        self.reg17  = Signal(8, reset=0x00) # YDATA_H        [R] internally writeable
-        self.reg18  = Signal(8, reset=0x00) # ZDATA_L        [R] internally writeable
-        self.reg19  = Signal(8, reset=0x00) # ZDATA_H        [R] internally writeable
-        self.reg20  = Signal(8, reset=0x00) # TEMP_L         [R] internally writeable
-        self.reg21  = Signal(8, reset=0x00) # TEMP_H         [R] internally writeable
+        self.reg8   = Signal(8, reset=0x00) # XDATA          [R] internally writable
+        self.reg9   = Signal(8, reset=0x00) # YDATA          [R] internally writable
+        self.reg10  = Signal(8, reset=0x00) # ZDATA          [R] internally writable
+        self.reg11  = Signal(8, reset=0x40) # STATUS         [R] internally writable
+        self.reg12  = Signal(8, reset=0x00) # FIFO_ENTRIES_L [R] internally writable
+        self.reg13  = Signal(8, reset=0x00) # FIFO_ENTRIES_H [R] internally writable
+        self.reg14  = Signal(8, reset=0x00) # XDATA_L        [R] internally writable
+        self.reg15  = Signal(8, reset=0x00) # XDATA_H        [R] internally writable
+        self.reg16  = Signal(8, reset=0x00) # YDATA_L        [R] internally writable
+        self.reg17  = Signal(8, reset=0x00) # YDATA_H        [R] internally writable
+        self.reg18  = Signal(8, reset=0x00) # ZDATA_L        [R] internally writable
+        self.reg19  = Signal(8, reset=0x00) # ZDATA_H        [R] internally writable
+        self.reg20  = Signal(8, reset=0x00) # TEMP_L         [R] internally writable
+        self.reg21  = Signal(8, reset=0x00) # TEMP_H         [R] internally writable
 
         self.reg31  = Signal(8, reset=0x00) # SOFT_RESET     [W]
         self.reg32  = Signal(8, reset=0x00) # THRESH_ACT_L   [RW]
@@ -199,6 +199,8 @@ class AccelCore(Module):
         self.mosi = Signal()  # MOSI pin input
         self.miso = Signal()  # MISO pin output
         self.csn  = Signal()  # CSN pin input
+        self.tx   = Signal()  # UART tx pin
+        self.rx   = Signal()  # UART rx pin
 
         # Led debug
         self.led  = Signal(1, reset=1)
@@ -225,12 +227,6 @@ class AccelCore(Module):
         self.bus_r    = Signal()
         self.bus_w    = Signal()
 
-        # FIFO data input signals
-        self.fifo_din = Signal(8)
-        self.fifo_level = Signal(max=10) # max=depth+2
-        self.fifo_writeable = Signal()
-        self.fifo_we = Signal()
-
         # CMD & ADDR storage
         self.str_cmd  = Signal(8)
         self.str_addr = Signal(8)
@@ -250,14 +246,6 @@ class AccelCore(Module):
         # Connect to the FIFO buffer
         fifo = SyncFIFOBuffered(width=8, depth=512)
         self.submodules += fifo
-
-        # Connnect fifo buffer input parts
-        self.comb += [
-            fifo.din.eq(self.fifo_din),
-            fifo.we.eq(self.fifo_we),
-            self.fifo_writeable.eq(fifo.writable),
-            self.fifo_level.eq(fifo.level),
-        ]
 
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
@@ -418,6 +406,28 @@ class AccelCore(Module):
             self.miso.eq(self.tx_buf[7]),
         ]
 
+        ############## Integrate UART submodules ###################
+
+        uart = UART(freq=freq, baud=baud)
+        self.submodules += uart
+
+        # Expose UART pins
+        self.comb += [
+            self.tx.eq(uart.tx),
+            uart.rx.eq(self.rx),
+        ]
+
+        # Write data from UART to FIFO if possible
+        self.sync += [
+            If(fifo.writable & uart.readable,
+                fifo.din.eq(uart.dout),
+                fifo.we.eq(1),
+            ).Else(
+                fifo.we.eq(0),
+            )
+        ]
+
+
 class SyncFIFOTest(Module):
     def __init__(self, width, depth):
         self.din = Signal(width)
@@ -447,12 +457,12 @@ class UART(Module):
     # ratio : Over sampling ratio (choose 100)
     def __init__(self, freq, baud=115200, ratio=100):
         # Exteral interface signals
-        self.txd = Signal(1, reset=1)
-        self.rxd = Signal()
+        self.tx = Signal(1, reset=1)
+        self.rx = Signal()
         # Internal interface signals
         self.din = Signal(8)
         self.dout = Signal(8)
-        self.writeable = Signal() # Assert indicates din can be written
+        self.writable = Signal() # Assert indicates din can be written
         self.readable = Signal()  # Assert inditated dout can be read
         self.tx_start = Signal()
         # Module local signals
@@ -466,13 +476,13 @@ class UART(Module):
         self.rxbitcnt = Signal(max=9)
         self.txbitcnt = Signal(max=10)
 
-        # To detect rising/falling edge of rxd pin
+        # To detect rising/falling edge of rx pin
         edt = EdgeDetector()
         self.submodules += edt
 
         # RX edge detecting
         self.comb += [
-            edt.i.eq(self.rxd)
+            edt.i.eq(self.rx)
         ]
 
         # Sampling behavior
@@ -522,7 +532,7 @@ class UART(Module):
         )
         rxfsm.act("START",
             If(self.rxsampling,
-                If(~self.rxd,
+                If(~self.rx,
                     NextState("GET_BITS"),
                 ).Else(
                     NextValue(self.rx_ena, 0),
@@ -533,7 +543,7 @@ class UART(Module):
         rxfsm.act("GET_BITS",
             If(self.rxsampling,
                 If(self.rxbitcnt < 8,
-                    NextValue(self.dout[7], self.rxd),
+                    NextValue(self.dout[7], self.rx),
                     NextValue(self.dout, self.dout >> 1),
                 ),
                 If(self.rxbitcnt == 8,
@@ -557,7 +567,7 @@ class UART(Module):
             If(self.tx_start, # START condition
                 NextValue(self.tx_start, 0),
                 NextValue(self.tx_ena, 1),
-                NextValue(self.txd, 0),
+                NextValue(self.tx, 0),
                 NextValue(self.txcount, int(ratio)-1),
                 NextValue(self.txbitcnt, 0),
                 NextState("START"),
@@ -571,13 +581,13 @@ class UART(Module):
         txfsm.act("SHIFT_OUT",
             If(self.txshifting,
                 If(self.txbitcnt < 8,
-                    NextValue(self.txd, self.din[0]),
+                    NextValue(self.tx, self.din[0]),
                     NextValue(self.din, self.din >> 1),
                 ),
                 If(self.txbitcnt == 8,
                     # Shift bit
                     NextValue(self.txbitcnt, self.txbitcnt + 1),
-                    NextValue(self.txd, 1),
+                    NextValue(self.tx, 1),
                 ).Elif(self.txbitcnt == 10, # STOP bit + IDLE
                     NextValue(self.tx_ena, 0),
                     NextState("IDLE"),
@@ -590,7 +600,7 @@ class UART(Module):
         # Status signal notification
         self.comb += [
             self.readable.eq(self.rxsampling & (self.rxbitcnt == 8)),
-            self.writeable.eq(~self.tx_ena),
+            self.writable.eq(~self.tx_ena),
         ]
 
 def SpiSlaveTestBench(dut):
@@ -760,6 +770,57 @@ def WriteReadRegTestBench(dut):
 
         yield
 
+def UARTWriteFIFOTestBench(dut):
+
+    r = 100  # Over sampling ratio
+    m = 4    # Prescaler ratio
+    s = 12   # RXD goes low at cycle 12th
+    data = 0 # Received data
+    i = 0
+    setup_pos = 0
+
+    for cycle in range(10000):
+
+        ###### Receive byte 1 #########
+        if cycle == 0:
+            yield dut.rx.eq(1)
+
+        if cycle == 12:
+            yield dut.rx.eq(0)
+            s = 12
+            data = 0x12A # Data received 0x2A
+            i = 0
+            setup_pos = 0
+
+        ###### Receive byte 2 #########
+        if cycle == 4200:
+            yield dut.rx.eq(1)
+
+        if cycle == 4500:
+            yield dut.rx.eq(0)
+            s = 4500
+            data = 0x117 # Data received 0x17
+            i = 0
+            setup_pos = 0
+
+        ###### generate rx waveform #########
+        if cycle == s + m*(r/2+1) + m*(r+1)*i:
+            sampling = cycle
+            setup_pos = sampling + m*(r/2+1)
+            i = i + 1
+
+        if cycle == setup_pos and i > 0:
+            if i < 9:
+                if data & 0x01:
+                    yield dut.rx.eq(1)
+                else:
+                    yield dut.rx.eq(0)
+                data = data >> 1
+            else:
+                yield dut.rx.eq(1)
+
+        yield
+
 def SyncFIFOTestTestBench(dut):
 
     for cycle in range(1000):
@@ -794,22 +855,38 @@ def SyncFIFOTestTestBench(dut):
 
 def UARTTestBench(dut):
 
-    r = 100 # Over sampling ratio
-    m = 4   # Prescaler ratio
-    s = 12  # RXD goes low at cycle 12th
-    i = 0   # index count variable
+    r = 100  # Over sampling ratio
+    m = 4    # Prescaler ratio
+    s = 12   # RXD goes low at cycle 12th
+    data = 0 # Received data
+    i = 0
     setup_pos = 0
-    dout = 0x12A # Data received 0x5A
 
     for cycle in range(10000):
+
+        ###### Receive byte 1 #########
         if cycle == 0:
-            yield dut.rxd.eq(1)
-            yield dut.din.eq(0x2A)
+            yield dut.rx.eq(1)
 
         if cycle == 12:
-            yield dut.rxd.eq(0)
-            yield dut.tx_start.eq(1)
+            yield dut.rx.eq(0)
+            s = 12
+            data = 0x12A # Data received 0x2A
+            i = 0
+            setup_pos = 0
 
+        ###### Receive byte 2 #########
+        if cycle == 4200:
+            yield dut.rx.eq(1)
+
+        if cycle == 4500:
+            yield dut.rx.eq(0)
+            s = 4500
+            data = 0x117 # Data received 0x17
+            i = 0
+            setup_pos = 0
+
+        ###### generate rx waveform #########
         if cycle == s + m*(r/2+1) + m*(r+1)*i:
             sampling = cycle
             setup_pos = sampling + m*(r/2+1)
@@ -817,30 +894,25 @@ def UARTTestBench(dut):
 
         if cycle == setup_pos and i > 0:
             if i < 9:
-                if dout & 0x01:
-                    yield dut.rxd.eq(1)
+                if data & 0x01:
+                    yield dut.rx.eq(1)
                 else:
-                    yield dut.rxd.eq(0)
-                dout = dout >> 1
+                    yield dut.rx.eq(0)
+                data = data >> 1
             else:
-                yield dut.rxd.eq(1)
-
-        if cycle == 4200:
-            yield dut.rxd.eq(1)
-
-        if cycle == 4500:
-            yield dut.rxd.eq(0)
+                yield dut.rx.eq(1)
 
         yield
 
 if __name__ == "__main__":
 
-    #dut = AccelCore(freq=50000000, baud=115200)
+    dut = AccelCore(freq=50000000, baud=115200)
     #print(verilog.convert(AccelCore(freq=50000000, baud=115200)))
     #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, ReadFiFoTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    run_simulation(dut, UARTWriteFIFOTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #os.system("gtkwave AccelCore.vcd")
 
     #dut = SyncFIFOTest(width=8, depth=2)
@@ -848,9 +920,9 @@ if __name__ == "__main__":
     #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
     #os.system("gtkwave SyncFIFOTest.vcd")
 
-    dut = UART(freq=50000000, baud=115200)
+    #dut = UART(freq=50000000, baud=115200)
     #print(verilog.convert(UART(freq=50000000, baud=115200)))
-    run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
+    #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
 
   
