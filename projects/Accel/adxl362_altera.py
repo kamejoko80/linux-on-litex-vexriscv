@@ -45,7 +45,7 @@ class ADXL362(Module):
             self.cd_sys.rst.eq(~rst_n),
         ]
 
-        # sys_clk pll setting (target 100MHz)
+        # sys_clk pll setting (target 200MHz)
         self.specials += \
             Instance("ALTPLL",
                 p_BANDWIDTH_TYPE="AUTO",
@@ -69,7 +69,7 @@ class ADXL362(Module):
         #self.comb += self.cd_sys.clk.eq(clk50)
 
         # Integrate accel core
-        core = SpiSlave()
+        core = AccelCore(freq=200000000, baud=115200)
         self.submodules += core
 
         self.comb += [

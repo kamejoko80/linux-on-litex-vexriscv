@@ -63,7 +63,7 @@ class ADXL362(Module):
         self.specials += AsyncResetSynchronizer(self.cd_por, self.reset)
 
         # Integrate accel core
-        core = SpiSlave()
+        core = AccelCore(freq=200000000, baud=115200)
         self.submodules += core
 
         self.comb += [

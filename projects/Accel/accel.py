@@ -192,8 +192,8 @@ class RegisterArray(Module):
             )
         ]
 
-class SpiSlave(Module):
-    def __init__(self):
+class AccelCore(Module):
+    def __init__(self, freq, baud=115200):
         # Physical pins interface
         self.sck  = Signal()  # SCK pin input
         self.mosi = Signal()  # MOSI pin input
@@ -445,7 +445,7 @@ class UART(Module):
     # freg  : sys_clk frequency
     # baud  : Uart baud rate
     # ratio : Over sampling ratio (choose 100)
-    def __init__(self, freq, baud, ratio=100):
+    def __init__(self, freq, baud=115200, ratio=100):
         # Exteral interface signals
         self.txd = Signal(1, reset=1)
         self.rxd = Signal()
@@ -835,13 +835,13 @@ def UARTTestBench(dut):
 
 if __name__ == "__main__":
 
-    #dut = SpiSlave()
-    #print(verilog.convert(SpiSlave()))
-    #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #run_simulation(dut, ReadFiFoTestBench(dut), clocks={"sys": 10}, vcd_name="SpiSlave.vcd")
-    #os.system("gtkwave SpiSlave.vcd")
+    #dut = AccelCore(freq=50000000, baud=115200)
+    #print(verilog.convert(AccelCore(freq=50000000, baud=115200)))
+    #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, ReadFiFoTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #os.system("gtkwave AccelCore.vcd")
 
     #dut = SyncFIFOTest(width=8, depth=2)
     #print(verilog.convert(SyncFIFOTest(width=8, depth=32)))
