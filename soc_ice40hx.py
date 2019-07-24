@@ -69,7 +69,8 @@ def SoCICE40HX(soc_cls, **kwargs):
             self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
             spi_master.add_source(self.platform)
 
-            # Custome SPI slave
-            self.submodules.spi_slave = spi_slave = SpiSlave(self.platform.request("spi_slave", 0))
+            # Custom accel simulator IP core
+            accel = AccelCore(freq=48000000, baud=115200, pads=self.platform.request("spi_slave", 0))
+            self.submodules += accel
 
     return _SoCLinux(**kwargs)

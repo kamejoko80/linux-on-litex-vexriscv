@@ -259,6 +259,7 @@ class AccelCore(Module):
         # FSM behavior description
         fsm.act("IDLE",
             If(~self.csn,
+                NextValue(self.tx_buf, 0),
                 NextState("CMD_PHASE"),
             )
         )
@@ -779,7 +780,7 @@ def UARTWriteFIFOTestBench(dut):
     i = 0
     setup_pos = 0
 
-    for cycle in range(10000):
+    for cycle in range(14000):
 
         ###### Receive byte 1 #########
         if cycle == 0:
@@ -802,6 +803,17 @@ def UARTWriteFIFOTestBench(dut):
             data = 0x117 # Data received 0x17
             i = 0
             setup_pos = 0
+            
+        ###### Receive byte 3 #########
+        if cycle == 8000:
+            yield dut.rx.eq(1)
+
+        if cycle == 8500:
+            yield dut.rx.eq(0)
+            s = 8500
+            data = 0x1A5 # Data received 0xA5
+            i = 0
+            setup_pos = 0            
 
         ###### generate rx waveform #########
         if cycle == s + m*(r/2+1) + m*(r+1)*i:

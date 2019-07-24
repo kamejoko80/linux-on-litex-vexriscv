@@ -68,7 +68,8 @@ def SoCVexRiscv(soc_cls, **kwargs):
             self.register_mem("w2a_bridge", 0x30000000, w2a_bridge.bus, 1000)
             w2a_bridge.add_source(self.platform)
 
-            # Custome SPI slave
-            self.submodules.spi_slave = spi_slave = SpiSlave(self.platform.request("spi", 0))
+            # Custom accel simulator IP core
+            accel = AccelCore(freq=100000000, baud=115200, pads=self.platform.request("spi", 0))
+            self.submodules += accel
             
     return _SoCLinux(**kwargs)
