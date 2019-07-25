@@ -214,6 +214,7 @@ class AccelCore(Module):
         self.sck_r    = Signal()  # SCK rising edge detect signal (wire)
         self.sck_f    = Signal()  # SCK falling edge detect signal (wire)
         self.csn_cnt  = Signal(2) # CSN edge detect counter
+        self.csn_r    = Signal()  # CSN rising edge detect signal (wire)
         self.csn_f    = Signal()  # SCK falling edge detect signal (wire)
         self.mosi_cnt = Signal(2) # MOSI edge detect counter
         self.bitcnt   = Signal(3) # Bit count
@@ -311,7 +312,17 @@ class AccelCore(Module):
         )
         fsm.act("REG_WRITE_VALUE",
             NextValue(self.bus_w, 0),
-            NextState("IDLE"),
+            NextState("REG_WRITE_NEXT"),
+        )
+        fsm.act("REG_WRITE_NEXT",
+            If(self.csn_r,
+                NextState("IDLE"),
+            ).Elif(self.rxc,
+                NextValue(self.bus_addr, self.bus_addr + 1),
+                NextValue(self.bus_dw, self.rxd),
+                NextValue(self.bus_w, 1),
+                NextState("REG_WRITE_STROBE"),
+            )
         )
         fsm.act("LOAD_SHIFT_OUT_DATA",
             NextState("LOAD_TX_BUF"),
@@ -327,7 +338,9 @@ class AccelCore(Module):
             )
         )
         fsm.act("SHIFT_OUT_DONE",
-            If(self.bus_addr < 0x2D,
+            If(self.csn_r,
+                NextState("IDLE"),
+            ).Elif(self.bus_addr < 0x2D,
                 NextValue(self.bus_addr, self.bus_addr + 1),
                 NextValue(self.bus_r, 1),
                 NextState("LOAD_SHIFT_OUT_DATA"),
@@ -358,6 +371,7 @@ class AccelCore(Module):
         self.comb += [
             self.sck_r.eq(self.sck_cnt == 1),
             self.sck_f.eq(self.sck_cnt == 2),
+            self.csn_r.eq(self.csn_cnt == 1),            
             self.csn_f.eq(self.csn_cnt == 2),
         ]
 
@@ -803,7 +817,7 @@ def UARTWriteFIFOTestBench(dut):
             data = 0x117 # Data received 0x17
             i = 0
             setup_pos = 0
-            
+
         ###### Receive byte 3 #########
         if cycle == 8000:
             yield dut.rx.eq(1)
@@ -813,7 +827,7 @@ def UARTWriteFIFOTestBench(dut):
             s = 8500
             data = 0x1A5 # Data received 0xA5
             i = 0
-            setup_pos = 0            
+            setup_pos = 0
 
         ###### generate rx waveform #########
         if cycle == s + m*(r/2+1) + m*(r+1)*i:
