@@ -441,8 +441,14 @@ class AccelCore(Module):
                 fifo.we.eq(0),
             )
         ]
-
-
+        
+        ########### Accel behavior implementation #################
+        
+        self.comb += [
+            reg.reg11[1].eq(fifo.level>=6) , # FIFO_READY (at least one valid sample in the FIFO buffer)
+            reg.reg11[0].eq(fifo.level>=6) , # DATA_READY (new valid sample available)
+        ]
+        
 class SyncFIFOTest(Module):
     def __init__(self, width, depth):
         self.din = Signal(width)
