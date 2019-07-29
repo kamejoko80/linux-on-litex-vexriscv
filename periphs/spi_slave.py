@@ -435,8 +435,10 @@ class AccelCore(Module):
         # Write data from UART to FIFO if possible
         self.sync += [
             If(fifo.writable & uart.readable,
-                fifo.din.eq(uart.dout),
-                fifo.we.eq(1),
+                If(fifo.level <= 511,
+                    fifo.din.eq(uart.dout),
+                    fifo.we.eq(1),
+                ),
             ).Else(
                 fifo.we.eq(0),
             )
@@ -446,7 +448,9 @@ class AccelCore(Module):
         
         self.comb += [
             reg.reg11[1].eq(fifo.level>=6) , # FIFO_READY (at least one valid sample in the FIFO buffer)
-            reg.reg11[0].eq(fifo.level>=6) , # DATA_READY (new valid sample available)
+            reg.reg11[0].eq(fifo.level>=6) , # DATA_READY (new valid sample available) (not implement)
+            reg.reg12.eq(fifo.level[:8]),    # FIFO_ENTRIES_L
+            reg.reg13.eq(fifo.level[8:]),    # FIFO_ENTRIES_H            
         ]
         
 class SyncFIFOTest(Module):
