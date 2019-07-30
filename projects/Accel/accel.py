@@ -221,6 +221,9 @@ class AccelCore(Module):
         self.mosi_s   = Signal()  # MOSI sample (wire)
         self.tx_buf   = Signal(8) # TX data buffer
 
+        # Accel core behavior temporary signals
+        self.fifo_samples = Signal(9, reset=0x80)
+
         # Register set internal bus, signals
         self.bus_addr = Signal(8)
         self.bus_dw   = Signal(8)
@@ -433,26 +436,110 @@ class AccelCore(Module):
         ]
 
         # Write data from UART to FIFO if possible
-        self.sync += [
+        uffsm = FSM(reset_state = "NORMAL")
+        self.submodules += uffsm
+
+        uffsm.act("NORMAL",
             If(fifo.writable & uart.readable,
-                If(fifo.level <= 511,
-                    fifo.din.eq(uart.dout),
-                    fifo.we.eq(1),
+                If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
+                    If(fifo.level >= 512,
+                       NextValue(fifo.re, 1), # Kick out the oldest element
+                       NextState("KICK_OUT"),
+                    ).Else(
+                        NextValue(fifo.din, uart.dout),
+                        NextValue(fifo.we, 1),
+                    ),
+                ).Elif(fifo.level <= 511, # Treast as oldest saved mode
+                    NextValue(fifo.din, uart.dout),
+                    NextValue(fifo.we, 1),
                 ),
             ).Else(
-                fifo.we.eq(0),
+                NextValue(fifo.we, 0),
+            )
+        )
+        uffsm.act("KICK_OUT",
+            NextValue(fifo.din, uart.dout), # Write the newest element to the FIFO
+            NextValue(fifo.we, 1),
+            NextState("NORMAL"),
+        )
+
+        ########### Accel behavior implementation #################
+
+        self.comb += [
+            reg.reg12.eq(fifo.level[:8]),            # FIFO_ENTRIES_L
+            reg.reg13.eq(fifo.level[8:]),            # FIFO_ENTRIES_H
+            self.fifo_samples[:8].eq(reg.reg41[:8]), # FIFO_SAMPLES (LSB)
+            self.fifo_samples[8:].eq(reg.reg40[3]),  # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
+        ]
+
+        self.sync += [
+            If(fifo.level >= self.fifo_samples,
+                reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
+            ),
+            If(fifo.level==0,
+                reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
+            ),
+            reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
+            reg.reg11[0].eq(fifo.level>=6),          # DATA_READY (new valid sample available) (not implement)
+        ]
+
+class ODRController(Module):
+    # freg  : sys_clk frequency
+    # fbase : based frequency output (after prescaler)
+    def __init__(self, freq, fbase=400):
+        # Exteral interface signals
+        self.ena   = Signal()
+        self.odr   = Signal(3)
+        self.foutr = Signal()
+        # Module local signals
+        self.fout   = Signal()
+        self.prescaler = Signal(max=int(freq/fbase)-1)
+        self.cnt = Signal(max=int(fbase/12.5)-1)
+        self.cpt = Signal(max=int(fbase/12.5)-1)
+
+        # Programmable divider's parametter definition
+        self.comb += [
+            Case(self.odr, {
+                0:         self.cpt.eq(int(fbase/(12.5*1))-1),  # 12.5 Hz
+                1:         self.cpt.eq(int(fbase/(12.5*2))-1),  # 25   Hz
+                2:         self.cpt.eq(int(fbase/(12.5*4))-1),  # 50   Hz
+                3:         self.cpt.eq(int(fbase/(12.5*8))-1),  # 100  Hz
+                4:         self.cpt.eq(int(fbase/(12.5*16))-1), # 200  Hz
+                "default": self.cpt.eq(0),                      # 400  Hz
+            })
+        ]
+
+        # Programmable clock divider implementation
+        self.sync += [
+            If(self.ena,
+                If(self.prescaler == int(freq/fbase)-1,
+                    self.prescaler.eq(0),
+                    If(self.odr >= 5,
+                        self.fout.eq(~self.fout), # Fout = fbase
+                    ).Elif(self.cnt == self.cpt,
+                        self.cnt.eq(0),
+                        self.fout.eq(~self.fout), # Fout = fbase/n
+                    ).Else(
+                        self.cnt.eq(self.cnt + 1),
+                    ),
+                ).Else(
+                    self.prescaler.eq(self.prescaler + 1),
+                )
+            ).Else(
+                self.fout.eq(0),
             )
         ]
-        
-        ########### Accel behavior implementation #################
-        
+
+        # Generate rissing edge output
+        edt = ResetInserter()(EdgeDetector())
+        self.submodules += edt
+
         self.comb += [
-            reg.reg11[1].eq(fifo.level>=6) , # FIFO_READY (at least one valid sample in the FIFO buffer)
-            reg.reg11[0].eq(fifo.level>=6) , # DATA_READY (new valid sample available) (not implement)
-            reg.reg12.eq(fifo.level[:8]),    # FIFO_ENTRIES_L
-            reg.reg13.eq(fifo.level[8:]),    # FIFO_ENTRIES_H            
+            edt.reset.eq(~self.ena),
+            edt.i.eq(self.fout),
+            self.foutr.eq(edt.r),
         ]
-        
+
 class SyncFIFOTest(Module):
     def __init__(self, width, depth):
         self.din = Signal(width)
@@ -940,15 +1027,25 @@ def UARTTestBench(dut):
 
         yield
 
+def ODRControllerTestBench(dut):
+
+    for cycle in range(10000):
+
+        if cycle == 20:
+            yield dut.ena.eq(1)
+            yield dut.odr.eq(3)
+
+        yield
+
 if __name__ == "__main__":
 
-    dut = AccelCore(freq=50000000, baud=115200)
+    #dut = AccelCore(freq=50000000, baud=115200)
     #print(verilog.convert(AccelCore(freq=50000000, baud=115200)))
     #run_simulation(dut, WriteRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, ReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, WriteReadRegTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #run_simulation(dut, ReadFiFoTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
-    run_simulation(dut, UARTWriteFIFOTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
+    #run_simulation(dut, UARTWriteFIFOTestBench(dut), clocks={"sys": 10}, vcd_name="AccelCore.vcd")
     #os.system("gtkwave AccelCore.vcd")
 
     #dut = SyncFIFOTest(width=8, depth=2)
@@ -960,5 +1057,8 @@ if __name__ == "__main__":
     #print(verilog.convert(UART(freq=50000000, baud=115200)))
     #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
-
+    dut = ODRController(freq=8000, fbase=400)
+    #print(verilog.convert(ODRController(freq=50000000, fbase=400)))
+    run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
+    #os.system("gtkwave ODRController.vcd")
   
