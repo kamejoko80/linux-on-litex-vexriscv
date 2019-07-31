@@ -201,6 +201,8 @@ class AccelCore(Module):
         self.csn  = Signal()  # CSN pin input
         self.tx   = Signal()  # UART tx pin
         self.rx   = Signal()  # UART rx pin
+        self.int1 = Signal()  # INT1 interrupt pin
+        self.int2 = Signal()  # INT2 interrupt pin
 
         # Led debug
         self.led  = Signal(1, reset=1)
@@ -473,6 +475,7 @@ class AccelCore(Module):
         ]
 
         self.sync += [
+            reg.reg11[3].eq(fifo.level>=512),        # FIFO_OVERRUN
             If(fifo.level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
             ),
@@ -483,13 +486,55 @@ class AccelCore(Module):
             reg.reg11[0].eq(fifo.level>=6),          # DATA_READY (new valid sample available) (not implement)
         ]
 
+        # Add output data rate controller
+        odrctrl = ODRController(freq=freq, fbase=400)
+        self.submodules += odrctrl
+
+        # Connect to ODR parametter input
+        self.comb += [
+            odrctrl.odr.eq(reg.reg44[:3]),           # ODR[2:0] (FILTER_CTL)
+        ]
+
+        # ODR controller
+        self.sync += [
+            If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
+                If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
+                    odrctrl.ena.eq(0)
+                ).Else(
+                    odrctrl.ena.eq(1)
+                ),
+            ).Else(
+                odrctrl.ena.eq(0),
+            ),
+            If(odrctrl.foutr,
+                uart.din.eq(0x52),                   # Send request (R) to get more data from host PC
+                uart.tx_start.eq(1),                 # Send request
+            ),
+        ]
+
+        # Interrupt signaling
+        self.comb += [
+            # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP1 are set
+            If(~reg.reg42[7],
+                self.int1.eq(reg.reg42[2] & reg.reg11[2]),   # Active high
+            ).Else(
+                self.int1.eq(~reg.reg42[2] | ~reg.reg11[2]), # Active low
+            ),
+            # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP2 are set
+            If(~reg.reg43[7],
+                self.int2.eq(reg.reg43[2] & reg.reg11[2]),   # Active high
+            ).Else(
+                self.int2.eq(~reg.reg43[2] | ~reg.reg11[2]), # Active low
+            )
+        ]
+
 class ODRController(Module):
     # freg  : sys_clk frequency
     # fbase : based frequency output (after prescaler)
     def __init__(self, freq, fbase=400):
         # Exteral interface signals
-        self.ena   = Signal()
-        self.odr   = Signal(3)
+        self.ena = Signal()
+        self.odr = Signal(3)
         self.foutr = Signal()
         # Module local signals
         self.fout   = Signal()
