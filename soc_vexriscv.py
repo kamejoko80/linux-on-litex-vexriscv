@@ -10,7 +10,7 @@ from litex.soc.integration.soc_core import mem_decoder
 from litex.soc.cores.spi_flash import SpiFlash
 
 from periphs.misc import *
-from periphs.spi_slave import *
+from periphs.accel import *
 
 # SoCVexRiscv -----------------------------------------------------------------------------------------
 
