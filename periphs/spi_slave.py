@@ -475,6 +475,7 @@ class AccelCore(Module):
         ]
 
         self.sync += [
+            reg.reg11[3].eq(fifo.level>=512),        # FIFO_OVERRUN
             If(fifo.level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
             ),
@@ -494,7 +495,7 @@ class AccelCore(Module):
             odrctrl.odr.eq(reg.reg44[:3]),           # ODR[2:0] (FILTER_CTL)
         ]
 
-        # For ODR testing
+        # ODR controller
         self.sync += [
             If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
                 If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
@@ -506,9 +507,25 @@ class AccelCore(Module):
                 odrctrl.ena.eq(0),
             ),
             If(odrctrl.foutr,
-                uart.din.eq(0x52),                   # Request host PC send more data
+                uart.din.eq(0x52),                   # Send request (R) to get more data from host PC
                 uart.tx_start.eq(1),                 # Send request
             ),
+        ]
+
+        # Interrupt signaling
+        self.comb += [
+            # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP1 are set
+            If(~reg.reg42[7],
+                pads.int1.eq(reg.reg42[2] & reg.reg11[2]),   # Active high
+            ).Else(
+                pads.int1.eq(~reg.reg42[2] | ~reg.reg11[2]), # Active low
+            ),
+            # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP2 are set
+            If(~reg.reg43[7],
+                pads.int2.eq(reg.reg43[2] & reg.reg11[2]),   # Active high
+            ).Else(
+                pads.int2.eq(~reg.reg43[2] | ~reg.reg11[2]), # Active low
+            )
         ]
 
 class ODRController(Module):
