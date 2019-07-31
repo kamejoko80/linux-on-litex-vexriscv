@@ -18,6 +18,7 @@ import os
 
 from migen import *
 from migen.fhdl import verilog
+from migen.fhdl.specials import Tristate
 from migen.genlib.misc import WaitTimer
 from migen.genlib.fifo import SyncFIFOBuffered
 
@@ -208,6 +209,7 @@ class AccelCore(Module):
         self.led  = Signal(1, reset=1)
 
         # Internal core signals
+        self.miso = Signal()  # Internal miso signal
         self.rxc  = Signal()  # Data RX complete (wire)
         self.rxd  = Signal(8) # RX data
 
@@ -423,8 +425,13 @@ class AccelCore(Module):
 
         # MISO output behavior description
         self.comb += [
-            pads.miso.eq(self.tx_buf[7]),
+            self.miso.eq(self.tx_buf[7]),
         ]
+
+        # Implement tristate on MISO pad
+        self.dummy = Signal()
+        self.specials += Tristate(pads.miso, self.miso, ~pads.csn, self.dummy)
+
 
         ############## Integrate UART submodules ###################
 
