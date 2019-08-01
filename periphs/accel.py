@@ -225,9 +225,6 @@ class AccelCore(Module):
         self.mosi_s   = Signal()  # MOSI sample (wire)
         self.tx_buf   = Signal(8) # TX data buffer
 
-        # Accel core behavior temporary signals
-        self.fifo_samples = Signal(9, reset=0x80)
-
         # Register set internal bus, signals
         self.bus_addr = Signal(8)
         self.bus_dw   = Signal(8)
@@ -252,7 +249,7 @@ class AccelCore(Module):
         ]
 
         # Connect to the FIFO buffer
-        fifo = SyncFIFOBuffered(width=8, depth=512)
+        fifo = SyncFIFOBuffered(width=8, depth=1024)
         self.submodules += fifo
 
         # Submodule FSM handles data in/out activities
@@ -451,14 +448,14 @@ class AccelCore(Module):
         uffsm.act("NORMAL",
             If(fifo.writable & uart.readable,
                 If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
-                    If(fifo.level >= 512,
+                    If(fifo.level >= 1024,
                        NextValue(fifo.re, 1), # Kick out the oldest element
                        NextState("KICK_OUT"),
                     ).Else(
                         NextValue(fifo.din, uart.dout),
                         NextValue(fifo.we, 1),
                     ),
-                ).Elif(fifo.level <= 511, # Treast as oldest saved mode
+                ).Elif(fifo.level <= 1023, # Treast as oldest saved mode
                     NextValue(fifo.din, uart.dout),
                     NextValue(fifo.we, 1),
                 ),
@@ -473,20 +470,23 @@ class AccelCore(Module):
         )
 
         ########### Accel behavior implementation #################
+        self.fifo_h_level = Signal(max=512)
+        self.fifo_samples = Signal(9, reset=0x80)
 
         self.comb += [
-            reg.reg12.eq(fifo.level[:8]),            # FIFO_ENTRIES_L
-            reg.reg13.eq(fifo.level[8:]),            # FIFO_ENTRIES_H
+            self.fifo_h_level.eq(fifo.level[1:]),    # fifo.level / 2
+            reg.reg12.eq(self.fifo_h_level[:8]),     # FIFO_ENTRIES_L
+            reg.reg13.eq(self.fifo_h_level[8:]),     # FIFO_ENTRIES_H
             self.fifo_samples[:8].eq(reg.reg41[:8]), # FIFO_SAMPLES (LSB)
             self.fifo_samples[8:].eq(reg.reg40[3]),  # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
         ]
 
         self.sync += [
-            reg.reg11[3].eq(fifo.level>=512),        # FIFO_OVERRUN
-            If(fifo.level >= self.fifo_samples,
+            reg.reg11[3].eq(fifo.level>=1024),       # FIFO_OVERRUN
+            If(self.fifo_h_level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
             ),
-            If(fifo.level==0,
+            If(self.fifo_h_level == 0,
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
             ),
             reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
