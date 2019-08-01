@@ -69,13 +69,20 @@ def SoCICE40HX(soc_cls, **kwargs):
             self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
             spi_master.add_source(self.platform)
 
+            # Integrate SPI SDC master
+            #self.submodules.spi_sdc = spi_sdc = SpiMaster(self.platform.request("spi_sdc", 0))
+            #self.add_csr("spi_sdc", 11, allow_user_defined=True)
+            #self.add_interrupt("spi_sdc", 7, allow_user_defined=True)
+            #self.register_mem("spi_sdc", 0x40000000, spi_sdc.bus, 32)
+            #spi_sdc.add_source(self.platform)
+
             # Custom accel simulator IP core
             accel = AccelCore(freq=48000000, baud=115200, pads=self.platform.request("spi_slave", 0))
             self.submodules += accel
 
             # Integrate int module
             self.submodules.gpio_isr = GpioISR(self.platform.request("gpio_irq", 0), rissing_edge_detect=False)
-            self.add_csr("gpio_isr", 11, allow_user_defined=True)
-            self.add_interrupt("gpio_isr", 7, allow_user_defined=True)
+            self.add_csr("gpio_isr", 12, allow_user_defined=True)
+            self.add_interrupt("gpio_isr", 8, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
