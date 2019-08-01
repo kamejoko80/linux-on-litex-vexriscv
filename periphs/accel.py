@@ -435,39 +435,15 @@ class AccelCore(Module):
         uart = UART(freq=freq, baud=baud)
         self.submodules += uart
 
+        # Uart FIFO buffer implementation
+        uartfifo = SyncFIFOBuffered(width=8, depth=1024)
+        self.submodules += uartfifo
+
         # Expose UART pins
         self.comb += [
             pads.tx.eq(uart.tx),
             uart.rx.eq(pads.rx),
         ]
-
-        # Write data from UART to FIFO if possible
-        uffsm = FSM(reset_state = "NORMAL")
-        self.submodules += uffsm
-
-        uffsm.act("NORMAL",
-            If(fifo.writable & uart.readable,
-                If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
-                    If(fifo.level >= 1024,
-                       NextValue(fifo.re, 1), # Kick out the oldest element
-                       NextState("KICK_OUT"),
-                    ).Else(
-                        NextValue(fifo.din, uart.dout),
-                        NextValue(fifo.we, 1),
-                    ),
-                ).Elif(fifo.level <= 1023, # Treast as oldest saved mode
-                    NextValue(fifo.din, uart.dout),
-                    NextValue(fifo.we, 1),
-                ),
-            ).Else(
-                NextValue(fifo.we, 0),
-            )
-        )
-        uffsm.act("KICK_OUT",
-            NextValue(fifo.din, uart.dout), # Write the newest element to the FIFO
-            NextValue(fifo.we, 1),
-            NextState("NORMAL"),
-        )
 
         ########### Accel behavior implementation #################
         self.fifo_h_level = Signal(max=512)
@@ -513,10 +489,10 @@ class AccelCore(Module):
             ).Else(
                 odrctrl.ena.eq(0),
             ),
-            If(odrctrl.foutr,
-                uart.din.eq(0x52),                   # Send request (R) to get more data from host PC
-                uart.tx_start.eq(1),                 # Send request
-            ),
+            #If(odrctrl.foutr,
+            #    uart.din.eq(0x52),                   # Send request (R) to get more data from host PC
+            #    uart.tx_start.eq(1),                 # Send request
+            #),
         ]
 
         # Interrupt signaling
@@ -534,6 +510,52 @@ class AccelCore(Module):
                 pads.int2.eq(~reg.reg43[2] | ~reg.reg11[2]), # Active low
             )
         ]
+
+        # UART FIFO behavior
+        self.sync += [
+            If(uartfifo.writable & uart.readable,
+                uartfifo.din.eq(uart.dout),
+                uartfifo.we.eq(1),
+            ).Else(
+                uartfifo.we.eq(0),
+            ),
+        ]
+
+        # Transfer data form UART FIFO to accel FIFO
+        ffsm = FSM(reset_state = "NORMAL")
+        self.submodules += ffsm
+
+        ffsm.act("NORMAL",
+            # Get UART FIFO data when ODR clock tick happened
+            If(fifo.writable & uartfifo.readable & odrctrl.foutr,
+                If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
+                    NextValue(uartfifo.re, 1), # Read data from UART FIFO
+                    If(fifo.level >= 1024,
+                       NextValue(fifo.re, 1), # Kick out the oldest element
+                       NextState("KICK_OUT"),
+                    ).Else(
+                       NextState("PREPARE_PUSH_FIFO"),
+                    ),
+                ).Elif(fifo.level <= 1023, # Treast as oldest saved mode
+                    NextValue(uartfifo.re, 1), # Read data from UART FIFO
+                    NextState("PREPARE_PUSH_FIFO"),
+                ),
+            ).Else(
+                NextValue(uartfifo.re, 0),
+                NextValue(fifo.we, 0),
+            )
+        )
+        ffsm.act("PREPARE_PUSH_FIFO",
+            NextValue(fifo.din, uartfifo.dout),
+            NextValue(fifo.we, 1),
+            NextState("NORMAL"),
+        )
+        ffsm.act("KICK_OUT",
+            NextValue(fifo.din, uartfifo.dout), # Write the newest element to the FIFO
+            NextValue(fifo.we, 1),
+            NextState("NORMAL"),
+        )
+
 
 class ODRController(Module):
     # freg  : sys_clk frequency
