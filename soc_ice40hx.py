@@ -77,12 +77,12 @@ def SoCICE40HX(soc_cls, **kwargs):
             #spi_sdc.add_source(self.platform)
 
             # Custom accel simulator IP core
-            accel = AccelCore(freq=48000000, baud=115200, pads=self.platform.request("spi_slave", 0))
-            self.submodules += accel
+            #accel = AccelCore(freq=48000000, baud=115200, pads=self.platform.request("spi_slave", 0))
+            #self.submodules += accel
 
             # Integrate int module
-            self.submodules.gpio_isr = GpioISR(self.platform.request("gpio_irq", 0), rissing_edge_detect=False)
-            self.add_csr("gpio_isr", 12, allow_user_defined=True)
-            self.add_interrupt("gpio_isr", 8, allow_user_defined=True)
+            #self.submodules.gpio_isr = GpioISR(self.platform.request("gpio_irq", 0), rissing_edge_detect=False)
+            #self.add_csr("gpio_isr", 12, allow_user_defined=True)
+            #self.add_interrupt("gpio_isr", 8, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
