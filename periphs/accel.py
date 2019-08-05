@@ -15,6 +15,7 @@
 #
 
 import os
+from random import randrange
 
 from migen import *
 from migen.fhdl import verilog
@@ -22,7 +23,8 @@ from migen.fhdl.specials import Tristate
 from migen.genlib.misc import WaitTimer
 from migen.genlib.fifo import SyncFIFOBuffered
 
-from random import randrange
+from litex.soc.interconnect.csr import *
+from litex.soc.interconnect.csr_eventmanager import *
 
 class Debouncer(Module):
     def __init__(self, cycles=1):
@@ -193,7 +195,7 @@ class RegisterArray(Module):
             )
         ]
 
-class AccelCore(Module):
+class AccelCore(Module, AutoCSR):
     def __init__(self, freq, baud, pads):
         # Physical pins interface
         #self.sck  = Signal()  # SCK pin input
@@ -429,22 +431,6 @@ class AccelCore(Module):
         self.dummy = Signal()
         self.specials += Tristate(pads.miso, self.miso, ~pads.csn, self.dummy)
 
-
-        ############## Integrate UART submodules ###################
-
-        uart = UART(freq=freq, baud=baud)
-        self.submodules += uart
-
-        # Uart FIFO buffer implementation
-        uartfifo = SyncFIFOBuffered(width=8, depth=1024)
-        self.submodules += uartfifo
-
-        # Expose UART pins
-        self.comb += [
-            pads.tx.eq(uart.tx),
-            uart.rx.eq(pads.rx),
-        ]
-
         ########### Accel behavior implementation #################
         self.fifo_h_level = Signal(max=512)
         self.fifo_samples = Signal(9, reset=0x80)
@@ -481,18 +467,15 @@ class AccelCore(Module):
         # ODR controller
         self.sync += [
             If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
-                If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
-                    odrctrl.ena.eq(0)
-                ).Else(
-                    odrctrl.ena.eq(1)
-                ),
+                #If(reg.reg11[2],                    # And FIFO_WATERMARK is cleared
+                #    odrctrl.ena.eq(0)
+                #).Else(
+                #    odrctrl.ena.eq(1)
+                #),
+                odrctrl.ena.eq(1),
             ).Else(
                 odrctrl.ena.eq(0),
             ),
-            #If(odrctrl.foutr,
-            #    uart.din.eq(0x52),                   # Send request (R) to get more data from host PC
-            #    uart.tx_start.eq(1),                 # Send request
-            #),
         ]
 
         # Interrupt signaling
@@ -511,49 +494,148 @@ class AccelCore(Module):
             )
         ]
 
-        # UART FIFO behavior
-        self.sync += [
-            If(uartfifo.writable & uart.readable,
-                uartfifo.din.eq(uart.dout),
-                uartfifo.we.eq(1),
-            ).Else(
-                uartfifo.we.eq(0),
-            ),
+        # ODR interrupt from IP to SoC
+        #self.submodules.ev = EventManager()
+        #self.ev.ip2soc_irq = EventSourcePulse() # Rising edge interrupt
+        #self.ev.finalize()
+
+        # ODR controller rising edge output triggers interrupt signal
+        #self.sync += [
+        #    self.ev.ip2soc_irq.trigger.eq(odrctrl.foutr),
+        #]
+
+        # SoC to accel IP core CSR interface
+        self.soc2ip_dx = CSRStorage(16)
+        self.soc2ip_dy = CSRStorage(16)
+        self.soc2ip_dz = CSRStorage(16)
+        self.soc2ip_wr = CSRStorage(1, reset = 0)
+        self.soc2ip_full = CSRStatus(1)
+        self.soc2ip_done = CSRStatus(1, reset = 0)
+
+        # Internal signals
+        self.cnt = Signal(3)
+
+        # Detect rising edge soc2ip_wr
+        soc2ip_wr_edt = EdgeDetector()
+        self.submodules += soc2ip_wr_edt
+
+        self.comb += [
+            soc2ip_wr_edt.i.eq(self.soc2ip_wr.storage),
         ]
 
-        # Transfer data form UART FIFO to accel FIFO
-        ffsm = FSM(reset_state = "NORMAL")
+        # Connect to the FIFO buffer
+        csrfifo = SyncFIFOBuffered(width=8, depth=300) # depth should be 3*2*n
+        self.submodules += csrfifo
+
+        # CSR fifo full status
+        self.comb += [
+            self.soc2ip_full.status.eq(csrfifo.level > (300-6))
+        ]
+
+        # Transfer data from SoC to csrfifo
+        csrffsm = FSM(reset_state = "IDLE")
+        self.submodules += csrffsm
+
+        # Copy from SoC to csr fifo
+        csrffsm.act("IDLE",
+            If(csrfifo.writable & soc2ip_wr_edt.r & (csrfifo.level<=(300-6)),
+                NextValue(self.soc2ip_done.status, 0), # clear done flag
+                NextState("PUSH_FIFO"),
+            ),
+        )
+        csrffsm.act("PUSH_FIFO",
+            NextValue(csrfifo.din, self.soc2ip_dx.storage[:8]),
+            NextValue(csrfifo.we, 1),
+            NextState("PUSH_FIFO_XL"),
+        )
+        csrffsm.act("PUSH_FIFO_XL",
+            NextValue(csrfifo.din, self.soc2ip_dx.storage[8:]),
+            NextState("PUSH_FIFO_XH"),
+        )
+        csrffsm.act("PUSH_FIFO_XH",
+            NextValue(csrfifo.din, self.soc2ip_dy.storage[:8]),
+            NextState("PUSH_FIFO_YL"),
+        )
+        csrffsm.act("PUSH_FIFO_YL",
+            NextValue(csrfifo.din, self.soc2ip_dy.storage[8:]),
+            NextState("PUSH_FIFO_YH"),
+        )
+        csrffsm.act("PUSH_FIFO_YH",
+            NextValue(csrfifo.din, self.soc2ip_dz.storage[:8]),
+            NextState("PUSH_FIFO_ZL"),
+        )
+        csrffsm.act("PUSH_FIFO_ZL",
+            NextValue(csrfifo.din, self.soc2ip_dz.storage[8:]),
+            NextState("PUSH_FIFO_ZH"),
+        )
+        csrffsm.act("PUSH_FIFO_ZH",
+            NextValue(self.soc2ip_done.status, 1), # set done flag
+            NextValue(csrfifo.we, 0),
+            NextState("IDLE"),
+        )
+
+        # Transfer data csrfifo to accel fifo
+        ffsm = FSM(reset_state = "IDLE")
         self.submodules += ffsm
 
-        ffsm.act("NORMAL",
-            # Get UART FIFO data when ODR clock tick happened
-            If(fifo.writable & uartfifo.readable & odrctrl.foutr,
+        # Copy csr fifo to accel fifo behavior implementation
+        ffsm.act("IDLE",
+            If(fifo.writable & odrctrl.foutr & csrfifo.readable & (csrfifo.level>=6),
                 If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
-                    NextValue(uartfifo.re, 1), # Read data from UART FIFO
-                    If(fifo.level >= 1024,
-                       NextValue(fifo.re, 1), # Kick out the oldest element
+                    If(fifo.level >= 1020, # 1024/6 = 1020
+                       NextValue(self.cnt, 0),
                        NextState("KICK_OUT"),
                     ).Else(
-                       NextState("PREPARE_PUSH_FIFO"),
+                       NextValue(csrfifo.re, 1),
+                       NextState("READ_CSR_FIFO"),
                     ),
-                ).Elif(fifo.level <= 1023, # Treast as oldest saved mode
-                    NextValue(uartfifo.re, 1), # Read data from UART FIFO
-                    NextState("PREPARE_PUSH_FIFO"),
+                ).Elif(fifo.level <= 1014, # (1020-6) Treast as oldest saved mode
+                    NextValue(csrfifo.re, 1),
+                    NextState("READ_CSR_FIFO"),
                 ),
-            ).Else(
-                NextValue(uartfifo.re, 0),
-                NextValue(fifo.we, 0),
-            )
+            ),
         )
-        ffsm.act("PREPARE_PUSH_FIFO",
-            NextValue(fifo.din, uartfifo.dout),
+        ffsm.act("READ_CSR_FIFO",
+            NextState("PUSH_FIFO"),
+        )
+        ffsm.act("PUSH_FIFO",
+            NextValue(fifo.din, csrfifo.dout),
             NextValue(fifo.we, 1),
-            NextState("NORMAL"),
+            NextState("PUSH_FIFO_XL"),
+        )
+        ffsm.act("PUSH_FIFO_XL",
+            NextValue(fifo.din, csrfifo.dout),
+            NextState("PUSH_FIFO_XH"),
+        )
+        ffsm.act("PUSH_FIFO_XH",
+            NextValue(fifo.din, csrfifo.dout),
+            NextState("PUSH_FIFO_YL"),
+        )
+        ffsm.act("PUSH_FIFO_YL",
+            NextValue(fifo.din, csrfifo.dout),
+            NextState("PUSH_FIFO_YH"),
+        )
+        ffsm.act("PUSH_FIFO_YH",
+            NextValue(fifo.din, csrfifo.dout),
+            NextState("PUSH_FIFO_ZL"),
+        )
+        ffsm.act("PUSH_FIFO_ZL",
+            NextValue(fifo.din, csrfifo.dout),
+            NextState("PUSH_FIFO_ZH"),
+        )
+        ffsm.act("PUSH_FIFO_ZH",
+            NextValue(csrfifo.re, 0),
+            NextValue(fifo.we, 0),
+            NextState("IDLE"),
         )
         ffsm.act("KICK_OUT",
-            NextValue(fifo.din, uartfifo.dout), # Write the newest element to the FIFO
-            NextValue(fifo.we, 1),
-            NextState("NORMAL"),
+            If(self.cnt < 7,
+                NextValue(fifo.re, 1),
+                NextValue(self.cnt, self.cnt + 1),
+            ).Else(
+                NextValue(fifo.re, 0),
+                NextState("PUSH_FIFO"),
+            )
         )
 
 

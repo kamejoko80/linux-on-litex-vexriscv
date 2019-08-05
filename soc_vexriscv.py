@@ -64,12 +64,20 @@ def SoCVexRiscv(soc_cls, **kwargs):
             # can_ctrl.add_source(self.platform)
 
             # Integrate wishbone to avalon bridge
-            self.submodules.w2a_bridge = w2a_bridge = W2ABridge()
-            self.register_mem("w2a_bridge", 0x30000000, w2a_bridge.bus, 1000)
-            w2a_bridge.add_source(self.platform)
+            # self.submodules.w2a_bridge = w2a_bridge = W2ABridge()
+            # self.register_mem("w2a_bridge", 0x30000000, w2a_bridge.bus, 1000)
+            # w2a_bridge.add_source(self.platform)
+
+            # Integrate SPI master
+            self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
+            self.add_csr("spi_master", 10, allow_user_defined=True)
+            self.add_interrupt("spi_master", 6, allow_user_defined=True)
+            self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
+            spi_master.add_source(self.platform)
 
             # Custom accel simulator IP core
-            accel = AccelCore(freq=100000000, baud=115200, pads=self.platform.request("spi", 0))
-            self.submodules += accel
-            
+            self.submodules.accel = accel = AccelCore(freq=100000000, baud=115200, pads=self.platform.request("spi_slave", 0))
+            self.add_csr("accel", 11, allow_user_defined=True)
+            #self.add_interrupt("accel", 7, allow_user_defined=True)
+
     return _SoCLinux(**kwargs)
