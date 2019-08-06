@@ -208,7 +208,7 @@ class AccelCore(Module, AutoCSR):
         #self.int2 = Signal()  # INT2 interrupt pin
 
         # Led debug
-        self.led  = Signal(1, reset=1)
+        # self.led  = Signal(1, reset=1)
 
         # Internal core signals
         self.miso = Signal()  # Internal miso signal
@@ -284,7 +284,7 @@ class AccelCore(Module, AutoCSR):
             ).Elif(self.str_cmd == 0x0D, # FIFO read
                 NextState("READ_FIFO"),
             ).Else(
-                NextValue(self.led, 0),
+                #NextValue(self.led, 0),
                 NextState("IDLE"),
             )
         )
@@ -495,84 +495,38 @@ class AccelCore(Module, AutoCSR):
         ]
 
         # ODR interrupt from IP to SoC
-        #self.submodules.ev = EventManager()
-        #self.ev.ip2soc_irq = EventSourcePulse() # Rising edge interrupt
-        #self.ev.finalize()
+        self.submodules.ev = EventManager()
+        self.ev.ip2soc_irq = EventSourcePulse() # Rising edge interrupt
+        self.ev.finalize()
 
         # ODR controller rising edge output triggers interrupt signal
-        #self.sync += [
-        #    self.ev.ip2soc_irq.trigger.eq(odrctrl.foutr),
-        #]
+        self.sync += [
+            self.ev.ip2soc_irq.trigger.eq(odrctrl.foutr),
+        ]
 
         # SoC to accel IP core CSR interface
         self.soc2ip_dx = CSRStorage(16)
         self.soc2ip_dy = CSRStorage(16)
         self.soc2ip_dz = CSRStorage(16)
-        self.soc2ip_wr = CSRStorage(1, reset = 0)
+        self.soc2ip_we = CSRStorage(1, reset = 0)
         self.soc2ip_full = CSRStatus(1)
         self.soc2ip_done = CSRStatus(1, reset = 0)
 
         # Internal signals
         self.cnt = Signal(3)
 
-        # Detect rising edge soc2ip_wr
-        soc2ip_wr_edt = EdgeDetector()
-        self.submodules += soc2ip_wr_edt
+        # Detect rising edge soc2ip_we
+        soc2ip_we_edt = EdgeDetector()
+        self.submodules += soc2ip_we_edt
 
         self.comb += [
-            soc2ip_wr_edt.i.eq(self.soc2ip_wr.storage),
+            soc2ip_we_edt.i.eq(self.soc2ip_we.storage),
         ]
-
-        # Connect to the FIFO buffer
-        csrfifo = SyncFIFOBuffered(width=8, depth=300) # depth should be 3*2*n
-        self.submodules += csrfifo
 
         # CSR fifo full status
         self.comb += [
-            self.soc2ip_full.status.eq(csrfifo.level > (300-6))
+            self.soc2ip_full.status.eq(fifo.level > 1014)
         ]
-
-        # Transfer data from SoC to csrfifo
-        csrffsm = FSM(reset_state = "IDLE")
-        self.submodules += csrffsm
-
-        # Copy from SoC to csr fifo
-        csrffsm.act("IDLE",
-            If(csrfifo.writable & soc2ip_wr_edt.r & (csrfifo.level<=(300-6)),
-                NextValue(self.soc2ip_done.status, 0), # clear done flag
-                NextState("PUSH_FIFO"),
-            ),
-        )
-        csrffsm.act("PUSH_FIFO",
-            NextValue(csrfifo.din, self.soc2ip_dx.storage[:8]),
-            NextValue(csrfifo.we, 1),
-            NextState("PUSH_FIFO_XL"),
-        )
-        csrffsm.act("PUSH_FIFO_XL",
-            NextValue(csrfifo.din, self.soc2ip_dx.storage[8:]),
-            NextState("PUSH_FIFO_XH"),
-        )
-        csrffsm.act("PUSH_FIFO_XH",
-            NextValue(csrfifo.din, self.soc2ip_dy.storage[:8]),
-            NextState("PUSH_FIFO_YL"),
-        )
-        csrffsm.act("PUSH_FIFO_YL",
-            NextValue(csrfifo.din, self.soc2ip_dy.storage[8:]),
-            NextState("PUSH_FIFO_YH"),
-        )
-        csrffsm.act("PUSH_FIFO_YH",
-            NextValue(csrfifo.din, self.soc2ip_dz.storage[:8]),
-            NextState("PUSH_FIFO_ZL"),
-        )
-        csrffsm.act("PUSH_FIFO_ZL",
-            NextValue(csrfifo.din, self.soc2ip_dz.storage[8:]),
-            NextState("PUSH_FIFO_ZH"),
-        )
-        csrffsm.act("PUSH_FIFO_ZH",
-            NextValue(self.soc2ip_done.status, 1), # set done flag
-            NextValue(csrfifo.we, 0),
-            NextState("IDLE"),
-        )
 
         # Transfer data csrfifo to accel fifo
         ffsm = FSM(reset_state = "IDLE")
@@ -580,52 +534,49 @@ class AccelCore(Module, AutoCSR):
 
         # Copy csr fifo to accel fifo behavior implementation
         ffsm.act("IDLE",
-            If(fifo.writable & odrctrl.foutr & csrfifo.readable & (csrfifo.level>=6),
+            If(fifo.writable & soc2ip_we_edt.r,
+                NextValue(self.soc2ip_done.status, 0), # clear done flag
                 If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
-                    If(fifo.level >= 1020, # 1024/6 = 1020
+                    If(fifo.level >= 1020, # 1024/6 => 1020
                        NextValue(self.cnt, 0),
                        NextState("KICK_OUT"),
                     ).Else(
-                       NextValue(csrfifo.re, 1),
-                       NextState("READ_CSR_FIFO"),
+                       NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
+                       NextState("XL_READY"),
                     ),
                 ).Elif(fifo.level <= 1014, # (1020-6) Treast as oldest saved mode
-                    NextValue(csrfifo.re, 1),
-                    NextState("READ_CSR_FIFO"),
+                    NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
+                    NextState("XL_READY"),
                 ),
             ),
         )
-        ffsm.act("READ_CSR_FIFO",
-            NextState("PUSH_FIFO"),
-        )
-        ffsm.act("PUSH_FIFO",
-            NextValue(fifo.din, csrfifo.dout),
+        ffsm.act("XL_READY",
             NextValue(fifo.we, 1),
-            NextState("PUSH_FIFO_XL"),
+            NextState("PUSH_XL"),
         )
-        ffsm.act("PUSH_FIFO_XL",
-            NextValue(fifo.din, csrfifo.dout),
-            NextState("PUSH_FIFO_XH"),
+        ffsm.act("PUSH_XL",
+            NextValue(fifo.din, self.soc2ip_dx.storage[8:]), # Load XH
+            NextState("PUSH_XH"),
         )
-        ffsm.act("PUSH_FIFO_XH",
-            NextValue(fifo.din, csrfifo.dout),
-            NextState("PUSH_FIFO_YL"),
+        ffsm.act("PUSH_XH",
+            NextValue(fifo.din, self.soc2ip_dy.storage[:8]), # Load YL
+            NextState("PUSH_YL"),
         )
-        ffsm.act("PUSH_FIFO_YL",
-            NextValue(fifo.din, csrfifo.dout),
-            NextState("PUSH_FIFO_YH"),
+        ffsm.act("PUSH_YL",
+            NextValue(fifo.din, self.soc2ip_dy.storage[8:]), # Load YH
+            NextState("PUSH_YH"),
         )
-        ffsm.act("PUSH_FIFO_YH",
-            NextValue(fifo.din, csrfifo.dout),
-            NextState("PUSH_FIFO_ZL"),
+        ffsm.act("PUSH_YH",
+            NextValue(fifo.din, self.soc2ip_dz.storage[:8]), # Load ZL
+            NextState("PUSH_ZL"),
         )
-        ffsm.act("PUSH_FIFO_ZL",
-            NextValue(fifo.din, csrfifo.dout),
-            NextState("PUSH_FIFO_ZH"),
+        ffsm.act("PUSH_ZL",
+            NextValue(fifo.din, self.soc2ip_dz.storage[8:]), # Load ZH
+            NextState("PUSH_ZH"),
         )
-        ffsm.act("PUSH_FIFO_ZH",
-            NextValue(csrfifo.re, 0),
+        ffsm.act("PUSH_ZH",
             NextValue(fifo.we, 0),
+            NextValue(self.soc2ip_done.status, 1), # set done flag
             NextState("IDLE"),
         )
         ffsm.act("KICK_OUT",
@@ -634,10 +585,10 @@ class AccelCore(Module, AutoCSR):
                 NextValue(self.cnt, self.cnt + 1),
             ).Else(
                 NextValue(fifo.re, 0),
-                NextState("PUSH_FIFO"),
+                NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
+                NextState("XL_READY"),
             )
         )
-
 
 class ODRController(Module):
     # freg  : sys_clk frequency
