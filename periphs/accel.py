@@ -215,6 +215,10 @@ class AccelCore(Module, AutoCSR):
         self.rxc  = Signal()  # Data RX complete (wire)
         self.rxd  = Signal(8) # RX data
 
+        # Core behavior internal signals
+        self.fifo_h_level = Signal(max=512)
+        self.fifo_samples = Signal(9, reset=0x80)
+        
         # Misc signals
         self.sck_cnt  = Signal(2) # SCK edge detect counter
         self.sck_r    = Signal()  # SCK rising edge detect signal (wire)
@@ -432,8 +436,6 @@ class AccelCore(Module, AutoCSR):
         self.specials += Tristate(pads.miso, self.miso, ~pads.csn, self.dummy)
 
         ########### Accel behavior implementation #################
-        self.fifo_h_level = Signal(max=512)
-        self.fifo_samples = Signal(9, reset=0x80)
 
         self.comb += [
             self.fifo_h_level.eq(fifo.level[1:]),    # fifo.level / 2
@@ -448,7 +450,7 @@ class AccelCore(Module, AutoCSR):
             If(self.fifo_h_level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
             ),
-            If(self.fifo_h_level == 0,
+            If(self.fifo_h_level <= 10,
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
             ),
             reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
