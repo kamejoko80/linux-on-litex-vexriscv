@@ -153,17 +153,19 @@ class ICE40_HX8K_B_EVN(Board):
         from litex.boards.targets import ice40_hx8k_b_evn
         Board.__init__(self, ice40_hx8k_b_evn.BaseSoC, "serial")
 
-    def flash(self):
+    def flash_gw(self):
         print("Flash gateware image")
         subprocess.call(["iceprog", "-o", "0", "build/ice40_hx8k_b_evn/gateware/top.bin"])
+
+    def flash_bios(self):
         print("Flash bios image")
         subprocess.call(["iceprog", "-o", "0x30000", "build/ice40_hx8k_b_evn/software/bios/bios.bin"])
 
     def flash_fw(self):
         print("Flash frimware image")
-        subprocess.call(["iceprog", "-o", "0x40000", "build/ice40_hx8k_b_evn/software/firmware/firmware.bin"])        
-        
-        
+        subprocess.call(["iceprog", "-o", "0x40000", "build/ice40_hx8k_b_evn/software/firmware/firmware.bin"])
+
+
 # ICE40 UP5K support ------------------------------------------------------------------------------------
 
 class ICE40_UP5K_B_EVN(Board):
@@ -171,9 +173,11 @@ class ICE40_UP5K_B_EVN(Board):
         from litex.boards.targets import ice40_up5k_b_evn
         Board.__init__(self, ice40_up5k_b_evn.BaseSoC, "serial")
 
-    def flash(self):
+    def flash_gw(self):
         print("Flash gateware image")
         subprocess.call(["iceprog", "-o", "0", "build/ice40_up5k_b_evn/gateware/top.bin"])
+
+    def flash_bios(self):
         print("Flash bios image")
         subprocess.call(["iceprog", "-o", "0x20000", "build/ice40_up5k_b_evn/software/bios/bios.bin"])
 
@@ -220,7 +224,7 @@ supported_boards = {
     "versa_ecp5":   VersaECP5,
     "ulx3s":        ULX3S,
     "ice40_hx8k_b_evn": ICE40_HX8K_B_EVN,
-    "ice40_up5k_b_evn": ICE40_UP5K_B_EVN,    
+    "ice40_up5k_b_evn": ICE40_UP5K_B_EVN,
     # Altera/Intel
     "de0nano":      De0Nano,
     # QMA/Tech
@@ -235,9 +239,11 @@ def main():
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--board", required=True, help="FPGA board")
     parser.add_argument("--build", action="store_true", help="build bitstream")
-    parser.add_argument("--build_sw", action="store_true", help="build software only")    
+    parser.add_argument("--build_sw", action="store_true", help="build software only")
     parser.add_argument("--load", action="store_true", help="load bitstream (to SRAM)")
     parser.add_argument("--flash", action="store_true", help="flash bitstream/images (to SPI Flash)")
+    parser.add_argument("--flash_gw", action="store_true", help="flash bitstream/images (to SPI Flash)")
+    parser.add_argument("--flash_bios", action="store_true", help="flash bios (to SPI Flash)")
     parser.add_argument("--flash_fw", action="store_true", help="flash firmware (to SPI Flash)")
     parser.add_argument("--local-ip", default="192.168.1.50", help="local IP address")
     parser.add_argument("--remote-ip", default="192.168.1.100", help="remote IP address of TFTP server")
@@ -275,7 +281,15 @@ def main():
             board.load()
 
         if args.flash:
-            board.flash()
+            board.flash_gw()
+            board.flash_bios()
+            board.flash_fw()
+
+        if args.flash_gw:
+            board.flash_gw()
+
+        if args.flash_bios:
+            board.flash_bios()
 
         if args.flash_fw:
             board.flash_fw()
