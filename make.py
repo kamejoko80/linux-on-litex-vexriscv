@@ -209,6 +209,18 @@ class QmaTech(Board):
         prog = USBBlaster()
         prog.load_bitstream("build/qmatech/gateware/top.sof")
 
+# AE4GX support ------------------------------------------------------------------------------------
+
+class AE4GX(Board):
+    def __init__(self):
+        from litex.boards.targets import ae4gx
+        Board.__init__(self, ae4gx.BaseSoC, "serial")
+
+    def load(self):
+        from litex.build.altera import USBBlaster
+        prog = USBBlaster()
+        prog.load_bitstream("build/ae4gx/gateware/top.sof")
+
 # Main ---------------------------------------------------------------------------------------------
 
 supported_boards = {
@@ -229,6 +241,8 @@ supported_boards = {
     "de0nano":      De0Nano,
     # QMA/Tech
     "qmatech":      QmaTech,
+    # AE4GX
+    "ae4gx":        AE4GX,
 }
 
 def main():
@@ -258,7 +272,7 @@ def main():
         soc_kwargs = {}
         if board_name in ["versa_ecp5", "ulx3s"]:
             soc_kwargs["toolchain"] = "trellis"
-        if board_name in ["qmatech"]:
+        if board_name in ["qmatech", "ae4gx"]:
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)

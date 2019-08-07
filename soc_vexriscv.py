@@ -78,6 +78,6 @@ def SoCVexRiscv(soc_cls, **kwargs):
             # Custom accel simulator IP core
             self.submodules.accel = accel = AccelCore(freq=100000000, baud=115200, pads=self.platform.request("spi_slave", 0))
             self.add_csr("accel", 11, allow_user_defined=True)
-            #self.add_interrupt("accel", 7, allow_user_defined=True)
+            self.add_interrupt("accel", 7, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
