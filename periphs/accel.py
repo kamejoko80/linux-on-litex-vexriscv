@@ -450,7 +450,7 @@ class AccelCore(Module, AutoCSR):
             If(self.fifo_h_level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
             ),
-            If(self.fifo_h_level <= 10,
+            If(fifo.level <= self.fifo_samples,
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
             ),
             reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
