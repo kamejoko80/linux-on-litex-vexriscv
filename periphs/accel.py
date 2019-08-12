@@ -218,7 +218,7 @@ class AccelCore(Module, AutoCSR):
         # Core behavior internal signals
         self.fifo_h_level = Signal(max=512)
         self.fifo_samples = Signal(9, reset=0x80)
-        
+
         # Misc signals
         self.sck_cnt  = Signal(2) # SCK edge detect counter
         self.sck_r    = Signal()  # SCK rising edge detect signal (wire)
@@ -243,7 +243,7 @@ class AccelCore(Module, AutoCSR):
         self.str_addr = Signal(8)
 
         # Connect to register set
-        reg = RegisterArray()
+        reg = ResetInserter()(RegisterArray())
         self.submodules += reg
 
         self.comb += [
@@ -437,12 +437,30 @@ class AccelCore(Module, AutoCSR):
 
         ########### Accel behavior implementation #################
 
+        # SoC to accel IP core CSR interface
+        self.soc2ip_dx = CSRStorage(16)
+        self.soc2ip_dy = CSRStorage(16)
+        self.soc2ip_dz = CSRStorage(16)
+        self.soc2ip_we = CSRStorage(1, reset = 0)  # SoC write data strobe
+        self.soc2ip_st = CSRStorage(1, reset = 0)  # SoC status
+        self.soc2ip_full = CSRStatus(1)
+        self.soc2ip_done = CSRStatus(1, reset = 0)
+        self.soc2ip_irq_code = CSRStatus(2)
+
         self.comb += [
             self.fifo_h_level.eq(fifo.level[1:]),    # fifo.level / 2
             reg.reg12.eq(self.fifo_h_level[:8]),     # FIFO_ENTRIES_L
             reg.reg13.eq(self.fifo_h_level[8:]),     # FIFO_ENTRIES_H
             self.fifo_samples[:8].eq(reg.reg41[:8]), # FIFO_SAMPLES (LSB)
             self.fifo_samples[8:].eq(reg.reg40[3]),  # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
+        ]
+
+        self.sync += [
+            If(reg.reg31 == 0x52, # Soft reset request
+               reg.reset.eq(1),
+            ).Else(
+               reg.reset.eq(0),
+            ),
         ]
 
         self.sync += [
@@ -503,16 +521,16 @@ class AccelCore(Module, AutoCSR):
 
         # ODR controller rising edge output triggers interrupt signal
         self.sync += [
-            self.ev.ip2soc_irq.trigger.eq(odrctrl.foutr),
+            If(reg.reset,
+                self.ev.ip2soc_irq.trigger.eq(1),
+                self.soc2ip_irq_code.status.eq(0x01), # IP request SoC reset
+            ).Elif(odrctrl.foutr & self.soc2ip_st.storage,
+                self.ev.ip2soc_irq.trigger.eq(1),
+                self.soc2ip_irq_code.status.eq(0x02), # IP request data transfer
+            ).Else(
+                self.ev.ip2soc_irq.trigger.eq(0),
+            )
         ]
-
-        # SoC to accel IP core CSR interface
-        self.soc2ip_dx = CSRStorage(16)
-        self.soc2ip_dy = CSRStorage(16)
-        self.soc2ip_dz = CSRStorage(16)
-        self.soc2ip_we = CSRStorage(1, reset = 0)
-        self.soc2ip_full = CSRStatus(1)
-        self.soc2ip_done = CSRStatus(1, reset = 0)
 
         # Internal signals
         self.cnt = Signal(3)
@@ -684,7 +702,7 @@ class UART(Module):
         self.din = Signal(8)
         self.dout = Signal(8)
         self.writable = Signal() # Assert indicates din can be written
-        self.readable = Signal()  # Assert inditated dout can be read
+        self.readable = Signal()  # Assert inditates dout can be read
         self.tx_start = Signal()
         # Module local signals
         self.prescaler = Signal(max=int(freq/(baud*ratio))-1)
