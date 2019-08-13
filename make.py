@@ -11,6 +11,7 @@ from soc_ice40up import SoCICE40UP
 from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
+from soc_ae4gx import SoCAE4GX
 
 # Board definition----------------------------------------------------------------------------------
 
@@ -272,8 +273,10 @@ def main():
         soc_kwargs = {}
         if board_name in ["versa_ecp5", "ulx3s"]:
             soc_kwargs["toolchain"] = "trellis"
-        if board_name in ["qmatech", "ae4gx"]:
+        if board_name in ["qmatech"]:
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
+        elif board_name in ["ae4gx"]:
+            soc = SoCAE4GX(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_up5k_b_evn"]:

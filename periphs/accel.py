@@ -208,7 +208,7 @@ class AccelCore(Module, AutoCSR):
         #self.int2 = Signal()  # INT2 interrupt pin
 
         # Led debug
-        # self.led  = Signal(1, reset=1)
+        # self.led  = Signal()
 
         # Internal core signals
         self.miso = Signal()  # Internal miso signal
@@ -437,6 +437,9 @@ class AccelCore(Module, AutoCSR):
 
         ########### Accel behavior implementation #################
 
+        # System clock domain
+        self.sys_rst = ResetSignal("sys")
+
         # SoC to accel IP core CSR interface
         self.soc2ip_dx = CSRStorage(16)
         self.soc2ip_dy = CSRStorage(16)
@@ -445,7 +448,6 @@ class AccelCore(Module, AutoCSR):
         self.soc2ip_st = CSRStorage(1, reset = 0)  # SoC status
         self.soc2ip_full = CSRStatus(1)
         self.soc2ip_done = CSRStatus(1, reset = 0)
-        self.soc2ip_irq_code = CSRStatus(2)
 
         self.comb += [
             self.fifo_h_level.eq(fifo.level[1:]),    # fifo.level / 2
@@ -467,9 +469,11 @@ class AccelCore(Module, AutoCSR):
             reg.reg11[3].eq(fifo.level>=1024),       # FIFO_OVERRUN
             If(self.fifo_h_level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
+                pads.led.eq(1),                      # LED debug on
             ),
             If(fifo.level <= self.fifo_samples,
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
+                pads.led.eq(0),                      # LED debug off                
             ),
             reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
             reg.reg11[0].eq(fifo.level>=6),          # DATA_READY (new valid sample available) (not implement)
@@ -487,11 +491,11 @@ class AccelCore(Module, AutoCSR):
         # ODR controller
         self.sync += [
             If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
-                #If(reg.reg11[2],                    # And FIFO_WATERMARK is cleared
-                #    odrctrl.ena.eq(0)
-                #).Else(
-                #    odrctrl.ena.eq(1)
-                #),
+                If(reg.reg11[2],                    # And FIFO_WATERMARK is cleared
+                    odrctrl.ena.eq(0)
+                ).Else(
+                    odrctrl.ena.eq(1)
+                ),
                 odrctrl.ena.eq(1),
             ).Else(
                 odrctrl.ena.eq(0),
@@ -522,11 +526,9 @@ class AccelCore(Module, AutoCSR):
         # ODR controller rising edge output triggers interrupt signal
         self.sync += [
             If(reg.reset,
-                self.ev.ip2soc_irq.trigger.eq(1),
-                self.soc2ip_irq_code.status.eq(0x01), # IP request SoC reset
+                self.sys_rst.eq(1), # System reset
             ).Elif(odrctrl.foutr & self.soc2ip_st.storage,
                 self.ev.ip2soc_irq.trigger.eq(1),
-                self.soc2ip_irq_code.status.eq(0x02), # IP request data transfer
             ).Else(
                 self.ev.ip2soc_irq.trigger.eq(0),
             )
