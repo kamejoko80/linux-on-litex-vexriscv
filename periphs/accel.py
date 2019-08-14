@@ -491,12 +491,12 @@ class AccelCore(Module, AutoCSR):
         # ODR controller
         self.sync += [
             If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
-                If(reg.reg11[2],                    # And FIFO_WATERMARK is cleared
+                If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
                     odrctrl.ena.eq(0)
                 ).Else(
                     odrctrl.ena.eq(1)
                 ),
-                odrctrl.ena.eq(1),
+                #odrctrl.ena.eq(1),
             ).Else(
                 odrctrl.ena.eq(0),
             ),
