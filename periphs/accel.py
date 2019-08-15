@@ -210,13 +210,16 @@ class AccelCore(Module, AutoCSR):
         # Led debug
         # self.led  = Signal()
 
+        # Constant, parametter setting
+        FIFO_DEPTH = 170
+
         # Internal core signals
         self.miso = Signal()  # Internal miso signal
         self.rxc  = Signal()  # Data RX complete (wire)
         self.rxd  = Signal(8) # RX data
 
         # Core behavior internal signals
-        self.fifo_h_level = Signal(max=512)
+        self.fifo_axis_level = Signal(max=512)
         self.fifo_samples = Signal(9, reset=0x80)
 
         # Misc signals
@@ -255,8 +258,13 @@ class AccelCore(Module, AutoCSR):
         ]
 
         # Connect to the FIFO buffer
-        fifo = SyncFIFOBuffered(width=8, depth=1024)
+        fifo = SyncFIFOBuffered(width=48, depth=FIFO_DEPTH)
         self.submodules += fifo
+
+        # FIFO entry for accessing
+        self.fifo_entry = Signal(48)
+        self.fifo_entry_ready = Signal(1, reset=0)
+        self.fifo_byte_sent = Signal(3, reset=0)
 
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
@@ -359,21 +367,37 @@ class AccelCore(Module, AutoCSR):
             )
         )
         fsm.act("READ_FIFO",
-            If(fifo.readable,
-                NextValue(fifo.re, 1),
-                NextState("READ_FIFO_STROBE"),
-            ).Else( #FIFO is empty
-                NextState("IDLE"),
+            If(self.fifo_byte_sent==0,
+                If(fifo.readable,
+                    NextValue(fifo.re, 1),
+                    NextState("READ_FIFO_ENTRY_STROBE"),
+                )
+            ).Else(
+                NextState("PREPARE_SHIFT_BYTE_OUT"),
             )
         )
-        fsm.act("READ_FIFO_STROBE",
+        fsm.act("READ_FIFO_ENTRY_STROBE",
             NextValue(fifo.re, 0),
-            NextValue(self.tx_buf, fifo.dout),
-            NextState("FIFO_SHIFTING_OUT"),
+            NextState("READ_FIFO_ENTRY"),
         )
-        fsm.act("FIFO_SHIFTING_OUT",
-            If(self.rxc,
-                NextState("READ_FIFO"),
+        fsm.act("READ_FIFO_ENTRY",
+            NextValue(self.fifo_entry, fifo.dout),
+            NextState("PREPARE_SHIFT_BYTE_OUT"),
+        )
+        fsm.act("PREPARE_SHIFT_BYTE_OUT",
+            NextValue(self.tx_buf, self.fifo_entry[0:8]),
+            NextValue(self.fifo_entry, self.fifo_entry >> 8),
+            NextValue(self.fifo_byte_sent, self.fifo_byte_sent + 1),
+            NextState("SHIFT_BYTE_OUT"),
+        )
+        fsm.act("SHIFT_BYTE_OUT",
+            If(self.rxc, # Just wait for byte shifting
+                If(self.fifo_byte_sent >= 6,
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ).Else(
+                    NextState("PREPARE_SHIFT_BYTE_OUT"),
+                )
             )
         )
 
@@ -450,9 +474,9 @@ class AccelCore(Module, AutoCSR):
         self.soc2ip_done = CSRStatus(1, reset = 0)
 
         self.comb += [
-            self.fifo_h_level.eq(fifo.level[1:]),    # fifo.level / 2
-            reg.reg12.eq(self.fifo_h_level[:8]),     # FIFO_ENTRIES_L
-            reg.reg13.eq(self.fifo_h_level[8:]),     # FIFO_ENTRIES_H
+            self.fifo_axis_level.eq(fifo.level*3),   # fifo.level / 3
+            reg.reg12.eq(self.fifo_axis_level[:8]),  # FIFO_ENTRIES_L
+            reg.reg13.eq(self.fifo_axis_level[8:]),  # FIFO_ENTRIES_H
             self.fifo_samples[:8].eq(reg.reg41[:8]), # FIFO_SAMPLES (LSB)
             self.fifo_samples[8:].eq(reg.reg40[3]),  # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
         ]
@@ -466,17 +490,17 @@ class AccelCore(Module, AutoCSR):
         ]
 
         self.sync += [
-            reg.reg11[3].eq(fifo.level>=1024),       # FIFO_OVERRUN
-            If(self.fifo_h_level >= self.fifo_samples,
+            reg.reg11[3].eq(fifo.level>=FIFO_DEPTH), # FIFO_OVERRUN
+            If(self.fifo_axis_level >= self.fifo_samples,
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
                 pads.led.eq(1),                      # LED debug on
             ),
-            If(fifo.level <= self.fifo_samples,
+            If((2*self.fifo_axis_level) <= self.fifo_samples,
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
-                pads.led.eq(0),                      # LED debug off                
+                pads.led.eq(0),                      # LED debug off
             ),
-            reg.reg11[1].eq(fifo.level>=6),          # FIFO_READY (at least one valid sample in the FIFO buffer)
-            reg.reg11[0].eq(fifo.level>=6),          # DATA_READY (new valid sample available) (not implement)
+            reg.reg11[1].eq(fifo.level>=1),          # FIFO_READY (at least one valid sample in the FIFO buffer)
+            reg.reg11[0].eq(fifo.level>=1),          # DATA_READY (new valid sample available) (not implement)
         ]
 
         # Add output data rate controller
@@ -534,9 +558,6 @@ class AccelCore(Module, AutoCSR):
             )
         ]
 
-        # Internal signals
-        self.cnt = Signal(3)
-
         # Detect rising edge soc2ip_we
         soc2ip_we_edt = EdgeDetector()
         self.submodules += soc2ip_we_edt
@@ -547,7 +568,7 @@ class AccelCore(Module, AutoCSR):
 
         # CSR fifo full status
         self.comb += [
-            self.soc2ip_full.status.eq(fifo.level > 1014)
+            self.soc2ip_full.status.eq(fifo.level >= FIFO_DEPTH)
         ]
 
         # Transfer data csrfifo to accel fifo
@@ -556,61 +577,32 @@ class AccelCore(Module, AutoCSR):
 
         # Copy csr fifo to accel fifo behavior implementation
         ffsm.act("IDLE",
-            If(fifo.writable & soc2ip_we_edt.r,
+            If(soc2ip_we_edt.r,
                 NextValue(self.soc2ip_done.status, 0), # clear done flag
                 If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
-                    If(fifo.level >= 1020, # 1024/6 => 1020
-                       NextValue(self.cnt, 0),
-                       NextState("KICK_OUT"),
-                    ).Else(
-                       NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
-                       NextState("XL_READY"),
-                    ),
-                ).Elif(fifo.level <= 1014, # (1020-6) Treast as oldest saved mode
-                    NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
-                    NextState("XL_READY"),
+                    NextValue(fifo.din[0:16], self.soc2ip_dx.storage),
+                    NextValue(fifo.din[16:32], self.soc2ip_dy.storage),
+                    NextValue(fifo.din[32:48], self.soc2ip_dz.storage),
+                    NextValue(fifo.we, 1),
+                    NextState("FIFO_WRITE_STROBE"),
+                ).Elif(fifo.writable, # Treast as oldest saved mode
+                    NextValue(fifo.din[0:16], self.soc2ip_dx.storage),
+                    NextValue(fifo.din[16:32], self.soc2ip_dy.storage),
+                    NextValue(fifo.din[32:48], self.soc2ip_dz.storage),
+                    NextValue(fifo.we, 1),
+                    NextState("FIFO_WRITE_STROBE"),
                 ),
             ),
         )
-        ffsm.act("XL_READY",
-            NextValue(fifo.we, 1),
-            NextState("PUSH_XL"),
-        )
-        ffsm.act("PUSH_XL",
-            NextValue(fifo.din, self.soc2ip_dx.storage[8:]), # Load XH
-            NextState("PUSH_XH"),
-        )
-        ffsm.act("PUSH_XH",
-            NextValue(fifo.din, self.soc2ip_dy.storage[:8]), # Load YL
-            NextState("PUSH_YL"),
-        )
-        ffsm.act("PUSH_YL",
-            NextValue(fifo.din, self.soc2ip_dy.storage[8:]), # Load YH
-            NextState("PUSH_YH"),
-        )
-        ffsm.act("PUSH_YH",
-            NextValue(fifo.din, self.soc2ip_dz.storage[:8]), # Load ZL
-            NextState("PUSH_ZL"),
-        )
-        ffsm.act("PUSH_ZL",
-            NextValue(fifo.din, self.soc2ip_dz.storage[8:]), # Load ZH
-            NextState("PUSH_ZH"),
-        )
-        ffsm.act("PUSH_ZH",
+        ffsm.act("FIFO_WRITE_STROBE",
             NextValue(fifo.we, 0),
-            NextValue(self.soc2ip_done.status, 1), # set done flag
+            NextState("FIFO_WRITE"),
+        )
+        ffsm.act("FIFO_WRITE",
+            NextValue(self.soc2ip_done.status, 1), # Set done flag
             NextState("IDLE"),
         )
-        ffsm.act("KICK_OUT",
-            If(self.cnt < 7,
-                NextValue(fifo.re, 1),
-                NextValue(self.cnt, self.cnt + 1),
-            ).Else(
-                NextValue(fifo.re, 0),
-                NextValue(fifo.din, self.soc2ip_dx.storage[:8]), # Load XL
-                NextState("XL_READY"),
-            )
-        )
+
 
 class ODRController(Module):
     # freg  : sys_clk frequency

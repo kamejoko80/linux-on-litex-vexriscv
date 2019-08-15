@@ -1098,12 +1098,17 @@ if __name__ == "__main__":
     #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
     #os.system("gtkwave SyncFIFOTest.vcd")
 
+    dut = SyncFIFOBuffered(width=8, depth=2)
+    #print(verilog.convert(SyncFIFOTest(width=8, depth=2)))
+    run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
+    os.system("gtkwave SyncFIFOTest.vcd")    
+    
     #dut = UART(freq=50000000, baud=115200)
     #print(verilog.convert(UART(freq=50000000, baud=115200)))
     #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
-    dut = ODRController(freq=8000, fbase=400)
+    #dut = ODRController(freq=8000, fbase=400)
     #print(verilog.convert(ODRController(freq=50000000, fbase=400)))
-    run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
+    #run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
     #os.system("gtkwave ODRController.vcd")
   
