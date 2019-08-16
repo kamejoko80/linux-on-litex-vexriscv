@@ -262,10 +262,9 @@ class AccelCore(Module, AutoCSR):
         self.submodules += fifo
 
         # FIFO entry for accessing
-        self.fifo_entry = Signal(48)
-        self.fifo_entry_ready = Signal(1, reset=0)
-        self.fifo_byte_sent = Signal(3, reset=0)
-        self.fifo_entry_read_cnt = Signal(max=FIFO_DEPTH, reset=0)
+        self.fifo_entry = Signal(48, reset_less=True)
+        self.fifo_byte_sent = Signal(3, reset=0, reset_less=True)
+        self.fifo_entry_read_cnt = Signal(max=FIFO_DEPTH, reset=0, reset_less=True)
 
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
@@ -368,7 +367,7 @@ class AccelCore(Module, AutoCSR):
             )
         )
         fsm.act("READ_FIFO",
-            If(self.fifo_byte_sent==0,
+            If(self.fifo_byte_sent == 0,
                 If(fifo.readable,
                     NextValue(fifo.re, 1),
                     NextState("READ_FIFO_ENTRY_STROBE"),
@@ -383,23 +382,38 @@ class AccelCore(Module, AutoCSR):
         )
         fsm.act("READ_FIFO_ENTRY",
             NextValue(self.fifo_entry_read_cnt, self.fifo_entry_read_cnt + 1),
+            NextValue(self.fifo_byte_sent, 1),
             NextValue(self.fifo_entry, fifo.dout),
             NextState("PREPARE_SHIFT_BYTE_OUT"),
         )
         fsm.act("PREPARE_SHIFT_BYTE_OUT",
-            NextValue(self.tx_buf, self.fifo_entry[0:8]),
-            NextValue(self.fifo_entry, self.fifo_entry >> 8),
-            NextValue(self.fifo_byte_sent, self.fifo_byte_sent + 1),
-            NextState("SHIFT_BYTE_OUT"),
+            If(self.fifo_byte_sent == 1,
+                NextValue(self.tx_buf, self.fifo_entry[0:8]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent == 2,
+                NextValue(self.tx_buf, self.fifo_entry[8:16]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent == 3,
+                NextValue(self.tx_buf, self.fifo_entry[16:24]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent == 4,
+                NextValue(self.tx_buf, self.fifo_entry[24:32]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent == 5,
+                NextValue(self.tx_buf, self.fifo_entry[32:40]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent == 6,
+                NextValue(self.tx_buf, self.fifo_entry[40:48]),
+                NextState("SHIFT_BYTE_OUT"),
+            ).Elif(self.fifo_byte_sent >= 7,
+                NextValue(self.fifo_byte_sent, 0),
+                NextState("READ_FIFO"),
+            )
         )
         fsm.act("SHIFT_BYTE_OUT",
             If(self.rxc, # Just wait for byte shifting
-                If(self.fifo_byte_sent >= 6,
-                    NextValue(self.fifo_byte_sent, 0),
-                    NextState("READ_FIFO"),
-                ).Else(
-                    NextState("PREPARE_SHIFT_BYTE_OUT"),
-                )
+                NextValue(self.fifo_byte_sent, self.fifo_byte_sent + 1),
+                NextState("PREPARE_SHIFT_BYTE_OUT"),
             )
         )
 
