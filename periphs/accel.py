@@ -265,6 +265,7 @@ class AccelCore(Module, AutoCSR):
         self.fifo_entry = Signal(48)
         self.fifo_entry_ready = Signal(1, reset=0)
         self.fifo_byte_sent = Signal(3, reset=0)
+        self.fifo_entry_read_cnt = Signal(max=FIFO_DEPTH, reset=0)
 
         # Submodule FSM handles data in/out activities
         fsm = ResetInserter()(FSM(reset_state = "IDLE"))
@@ -381,6 +382,7 @@ class AccelCore(Module, AutoCSR):
             NextState("READ_FIFO_ENTRY"),
         )
         fsm.act("READ_FIFO_ENTRY",
+            NextValue(self.fifo_entry_read_cnt, self.fifo_entry_read_cnt + 1),
             NextValue(self.fifo_entry, fifo.dout),
             NextState("PREPARE_SHIFT_BYTE_OUT"),
         )
@@ -495,7 +497,12 @@ class AccelCore(Module, AutoCSR):
                 reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
                 pads.led.eq(1),                      # LED debug on
             ),
-            If((2*self.fifo_axis_level) <= self.fifo_samples,
+            #If((2*self.fifo_axis_level) <= self.fifo_samples,
+            #    reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
+            #    pads.led.eq(0),                      # LED debug off
+            #),
+            If(3*self.fifo_entry_read_cnt >= self.fifo_samples,
+                self.fifo_entry_read_cnt.eq(0),      # Reset FIFO entry read counter
                 reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
                 pads.led.eq(0),                      # LED debug off
             ),
