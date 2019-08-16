@@ -515,12 +515,12 @@ class AccelCore(Module, AutoCSR):
         # ODR controller
         self.sync += [
             If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
-                If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
-                    odrctrl.ena.eq(0)
-                ).Else(
-                    odrctrl.ena.eq(1)
-                ),
-                #odrctrl.ena.eq(1),
+                #If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
+                #    odrctrl.ena.eq(0)
+                #).Else(
+                #    odrctrl.ena.eq(1)
+                #),
+                odrctrl.ena.eq(1),
             ).Else(
                 odrctrl.ena.eq(0),
             ),
@@ -568,7 +568,8 @@ class AccelCore(Module, AutoCSR):
 
         # CSR fifo full status
         self.comb += [
-            self.soc2ip_full.status.eq(fifo.level >= FIFO_DEPTH)
+            # FIFO full detect implementation (except FIFO stream mode)
+            self.soc2ip_full.status.eq((fifo.level >= FIFO_DEPTH) & (reg.reg40[:2] != 0x02))
         ]
 
         # Transfer data csrfifo to accel fifo
