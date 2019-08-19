@@ -80,117 +80,117 @@ class RegisterArray(Module):
         self.w      = Signal()
 
         # Register set
-        self.reg0   = Signal(8, reset=0xAD) # DEVID_AD       [R]
-        self.reg1   = Signal(8, reset=0x1D) # DEVID_MST      [R]
-        self.reg2   = Signal(8, reset=0xF2) # PARTID         [R]
-        self.reg3   = Signal(8, reset=0x01) # REVID          [R]
+        self.DEVID_AD       = Signal(8, reset=0xAD)      # DEVID_AD       [R]
+        self.DEVID_MST      = Signal(8, reset=0x1D)      # DEVID_MST      [R]
+        self.PARTID         = Signal(8, reset=0xF2)      # PARTID         [R]
+        self.REVID          = Signal(8, reset=0x01)      # REVID          [R]
 
-        self.reg8   = Signal(8, reset=0x00) # XDATA          [R] internally writable
-        self.reg9   = Signal(8, reset=0x00) # YDATA          [R] internally writable
-        self.reg10  = Signal(8, reset=0x00) # ZDATA          [R] internally writable
-        self.reg11  = Signal(8, reset=0x40) # STATUS         [R] internally writable
-        self.reg12  = Signal(8, reset=0x00) # FIFO_ENTRIES_L [R] internally writable
-        self.reg13  = Signal(8, reset=0x00) # FIFO_ENTRIES_H [R] internally writable
-        self.reg14  = Signal(8, reset=0x00) # XDATA_L        [R] internally writable
-        self.reg15  = Signal(8, reset=0x00) # XDATA_H        [R] internally writable
-        self.reg16  = Signal(8, reset=0x00) # YDATA_L        [R] internally writable
-        self.reg17  = Signal(8, reset=0x00) # YDATA_H        [R] internally writable
-        self.reg18  = Signal(8, reset=0x00) # ZDATA_L        [R] internally writable
-        self.reg19  = Signal(8, reset=0x00) # ZDATA_H        [R] internally writable
-        self.reg20  = Signal(8, reset=0x00) # TEMP_L         [R] internally writable
-        self.reg21  = Signal(8, reset=0x00) # TEMP_H         [R] internally writable
+        self.XDATA          = Signal(8, reset=0x00)      # XDATA          [R] internally writable
+        self.YDATA          = Signal(8, reset=0x00)      # YDATA          [R] internally writable
+        self.ZDATA          = Signal(8, reset=0x00)      # ZDATA          [R] internally writable
+        self.STATUS         = Signal(8, reset=0x40)      # STATUS         [R] internally writable
+        self.FIFO_ENTRIES_L = Signal(8, reset=0x00)      # FIFO_ENTRIES_L [R] internally writable
+        self.FIFO_ENTRIES_H = Signal(8, reset=0x00)      # FIFO_ENTRIES_H [R] internally writable
+        self.XDATA_L        = Signal(8, reset=0x00)      # XDATA_L        [R] internally writable
+        self.XDATA_H        = Signal(8, reset=0x00)      # XDATA_H        [R] internally writable
+        self.YDATA_L        = Signal(8, reset=0x00)      # YDATA_L        [R] internally writable
+        self.YDATA_H        = Signal(8, reset=0x00)      # YDATA_H        [R] internally writable
+        self.ZDATA_L        = Signal(8, reset=0x00)      # ZDATA_L        [R] internally writable
+        self.ZDATA_H        = Signal(8, reset=0x00)      # ZDATA_H        [R] internally writable
+        self.TEMP_L         = Signal(8, reset=0x00)      # TEMP_L         [R] internally writable
+        self.TEMP_H         = Signal(8, reset=0x00)      # TEMP_H         [R] internally writable
 
-        self.reg31  = Signal(8, reset=0x00) # SOFT_RESET     [W]
-        self.reg32  = Signal(8, reset=0x00) # THRESH_ACT_L   [RW]
-        self.reg33  = Signal(8, reset=0x00) # THRESH_ACT_H   [RW]
-        self.reg34  = Signal(8, reset=0x00) # TIME_ACT       [RW]
-        self.reg35  = Signal(8, reset=0x00) # THRESH_INACT_L [RW]
-        self.reg36  = Signal(8, reset=0x00) # THRESH_INACT_H [RW]
-        self.reg37  = Signal(8, reset=0x00) # TIME_INACT_L   [RW]
-        self.reg38  = Signal(8, reset=0x00) # TIME_INACT_H   [RW]
-        self.reg39  = Signal(8, reset=0x00) # ACT_INACT_CTL  [RW]
-        self.reg40  = Signal(8, reset=0x00) # FIFO_CONTROL   [RW]
-        self.reg41  = Signal(8, reset=0x80) # FIFO_SAMPLES   [RW]
-        self.reg42  = Signal(8, reset=0x00) # INTMAP1        [RW]
-        self.reg43  = Signal(8, reset=0x00) # INTMAP2        [RW]
-        self.reg44  = Signal(8, reset=0x13) # FILTER_CTL     [RW]
-        self.reg45  = Signal(8, reset=0x00) # POWER_CTL      [RW]
-       #self.reg46  = Signal(8, reset=0x00) # SELF_TEST      [RW]
+        self.SOFT_RESET     = Signal(8, reset=0x00)      # SOFT_RESET     [W]
+        self.THRESH_ACT_L   = Signal(8, reset=0x00)      # THRESH_ACT_L   [RW]
+        self.THRESH_ACT_H   = Signal(8, reset=0x00)      # THRESH_ACT_H   [RW]
+        self.TIME_ACT       = Signal(8, reset=0x00)      # TIME_ACT       [RW]
+        self.THRESH_INACT_L = Signal(8, reset=0x00)      # THRESH_INACT_L [RW]
+        self.THRESH_INACT_H = Signal(8, reset=0x00)      # THRESH_INACT_H [RW]
+        self.TIME_INACT_L   = Signal(8, reset=0x00)      # TIME_INACT_L   [RW]
+        self.TIME_INACT_H   = Signal(8, reset=0x00)      # TIME_INACT_H   [RW]
+        self.ACT_INACT_CTL  = Signal(8, reset=0x00)      # ACT_INACT_CTL  [RW]
+        self.FIFO_CONTROL   = Signal(8, reset=0x00)      # FIFO_CONTROL   [RW]
+        self.FIFO_SAMPLES   = Signal(8, reset=0x80)      # FIFO_SAMPLES   [RW]
+        self.INTMAP1        = Signal(8, reset=0x00)      # INTMAP1        [RW]
+        self.INTMAP2        = Signal(8, reset=0x00)      # INTMAP2        [RW]
+        self.FILTER_CTL     = Signal(8, reset=0x13)      # FILTER_CTL     [RW]
+        self.POWER_CTL      = Signal(8, reset=0x00)      # POWER_CTL      [RW]
+       #self.SELF_TEST      = Signal(8, reset=0x00)      # SELF_TEST      [RW]
 
         self.sync += [
             If(self.r,
                 Case(self.addr, {
-                    0:  self.dr.eq( self.reg0), # DEVID_AD       [R]  [0x00]
-                    1:  self.dr.eq( self.reg1), # DEVID_MST      [R]  [0x01]
-                    2:  self.dr.eq( self.reg2), # PARTID         [R]  [0x02]
-                    3:  self.dr.eq( self.reg3), # REVID          [R]  [0x03]
+                    0:  self.dr.eq(self.DEVID_AD),       # DEVID_AD       [R]  [0x00]
+                    1:  self.dr.eq(self.DEVID_MST),      # DEVID_MST      [R]  [0x01]
+                    2:  self.dr.eq(self.PARTID),         # PARTID         [R]  [0x02]
+                    3:  self.dr.eq(self.REVID),          # REVID          [R]  [0x03]
 
-                    8:  self.dr.eq( self.reg8), # XDATA          [R]  [0x08]
-                    9:  self.dr.eq( self.reg9), # YDATA          [R]  [0x09]
-                    10: self.dr.eq(self.reg10), # ZDATA          [R]  [0x0A]
-                    11: self.dr.eq(self.reg11), # STATUS         [R]  [0x0B]
-                    12: self.dr.eq(self.reg12), # FIFO_ENTRIES_L [R]  [0x0C]
-                    13: self.dr.eq(self.reg13), # FIFO_ENTRIES_H [R]  [0x0D]
-                    14: self.dr.eq(self.reg14), # XDATA_L        [R]  [0x0E]
-                    15: self.dr.eq(self.reg15), # XDATA_H        [R]  [0x0F]
-                    16: self.dr.eq(self.reg16), # YDATA_L        [R]  [0x10]
-                    17: self.dr.eq(self.reg17), # YDATA_H        [R]  [0x11]
-                    18: self.dr.eq(self.reg18), # ZDATA_L        [R]  [0x12]
-                    19: self.dr.eq(self.reg19), # ZDATA_H        [R]  [0x13]
-                    20: self.dr.eq(self.reg20), # TEMP_L         [R]  [0x14]
-                    21: self.dr.eq(self.reg21), # TEMP_H         [R]  [0x15]
+                    8:  self.dr.eq(self.XDATA),          # XDATA          [R]  [0x08]
+                    9:  self.dr.eq(self.YDATA),          # YDATA          [R]  [0x09]
+                    10: self.dr.eq(self.ZDATA),          # ZDATA          [R]  [0x0A]
+                    11: self.dr.eq(self.STATUS),         # STATUS         [R]  [0x0B]
+                    12: self.dr.eq(self.FIFO_ENTRIES_L), # FIFO_ENTRIES_L [R]  [0x0C]
+                    13: self.dr.eq(self.FIFO_ENTRIES_H), # FIFO_ENTRIES_H [R]  [0x0D]
+                    14: self.dr.eq(self.XDATA_L),        # XDATA_L        [R]  [0x0E]
+                    15: self.dr.eq(self.XDATA_H),        # XDATA_H        [R]  [0x0F]
+                    16: self.dr.eq(self.YDATA_L),        # YDATA_L        [R]  [0x10]
+                    17: self.dr.eq(self.YDATA_H),        # YDATA_H        [R]  [0x11]
+                    18: self.dr.eq(self.ZDATA_L),        # ZDATA_L        [R]  [0x12]
+                    19: self.dr.eq(self.ZDATA_H),        # ZDATA_H        [R]  [0x13]
+                    20: self.dr.eq(self.TEMP_L),         # TEMP_L         [R]  [0x14]
+                    21: self.dr.eq(self.TEMP_H),         # TEMP_H         [R]  [0x15]
 
-                   #31: self.dr.eq(self.reg31), # SOFT_RESET     [W]  [0x1F]
-                    32: self.dr.eq(self.reg32), # THRESH_ACT_L   [RW] [0x20]
-                    33: self.dr.eq(self.reg33), # THRESH_ACT_H   [RW] [0x21]
-                    34: self.dr.eq(self.reg34), # TIME_ACT       [RW] [0x22]
-                    35: self.dr.eq(self.reg35), # THRESH_INACT_L [RW] [0x23]
-                    36: self.dr.eq(self.reg36), # THRESH_INACT_H [RW] [0x24]
-                    37: self.dr.eq(self.reg37), # TIME_INACT_L   [RW] [0x25]
-                    38: self.dr.eq(self.reg38), # TIME_INACT_H   [RW] [0x26]
-                    39: self.dr.eq(self.reg39), # ACT_INACT_CTL  [RW] [0x27]
-                    40: self.dr.eq(self.reg40), # FIFO_CONTROL   [RW] [0x28]
-                    41: self.dr.eq(self.reg41), # FIFO_SAMPLES   [RW] [0x29]
-                    42: self.dr.eq(self.reg42), # INTMAP1        [RW] [0x2A]
-                    43: self.dr.eq(self.reg43), # INTMAP2        [RW] [0x2B]
-                    44: self.dr.eq(self.reg44), # FILTER_CTL     [RW] [0x2C]
-                    45: self.dr.eq(self.reg45), # POWER_CTL      [RW] [0x2D]
-                   #46: self.dr.eq(self.reg46), # SELF_TEST      [RW] [0x2E]
+                   #31: self.dr.eq(self.SOFT_RESET),     # SOFT_RESET     [W]  [0x1F]
+                    32: self.dr.eq(self.THRESH_ACT_L),   # THRESH_ACT_L   [RW] [0x20]
+                    33: self.dr.eq(self.THRESH_ACT_H),   # THRESH_ACT_H   [RW] [0x21]
+                    34: self.dr.eq(self.TIME_ACT),       # TIME_ACT       [RW] [0x22]
+                    35: self.dr.eq(self.THRESH_INACT_L), # THRESH_INACT_L [RW] [0x23]
+                    36: self.dr.eq(self.THRESH_INACT_H), # THRESH_INACT_H [RW] [0x24]
+                    37: self.dr.eq(self.TIME_INACT_L),   # TIME_INACT_L   [RW] [0x25]
+                    38: self.dr.eq(self.TIME_INACT_H),   # TIME_INACT_H   [RW] [0x26]
+                    39: self.dr.eq(self.ACT_INACT_CTL),  # ACT_INACT_CTL  [RW] [0x27]
+                    40: self.dr.eq(self.FIFO_CONTROL),   # FIFO_CONTROL   [RW] [0x28]
+                    41: self.dr.eq(self.FIFO_SAMPLES),   # FIFO_SAMPLES   [RW] [0x29]
+                    42: self.dr.eq(self.INTMAP1),        # INTMAP1        [RW] [0x2A]
+                    43: self.dr.eq(self.INTMAP2),        # INTMAP2        [RW] [0x2B]
+                    44: self.dr.eq(self.FILTER_CTL),     # FILTER_CTL     [RW] [0x2C]
+                    45: self.dr.eq(self.POWER_CTL),      # POWER_CTL      [RW] [0x2D]
+                   #46: self.dr.eq(self.SELF_TEST),      # SELF_TEST      [RW] [0x2E]
              "default": self.dr.eq(0),
                 })
             ).Elif(self.w,
                 Case(self.addr, {
-                   #8:  self.reg8.eq( self.dw), # XDATA          [R]
-                   #9:  self.reg9.eq( self.dw), # YDATA          [R]
-                   #10: self.reg10.eq(self.dw), # ZDATA          [R]
-                   #11: self.reg11.eq(self.dw), # STATUS         [R]
-                   #12: self.reg12.eq(self.dw), # FIFO_ENTRIES_L [R]
-                   #13: self.reg13.eq(self.dw), # FIFO_ENTRIES_H [R]
-                   #14: self.reg14.eq(self.dw), # XDATA_L        [R]
-                   #15: self.reg15.eq(self.dw), # XDATA_H        [R]
-                   #16: self.reg16.eq(self.dw), # YDATA_L        [R]
-                   #17: self.reg17.eq(self.dw), # YDATA_H        [R]
-                   #18: self.reg18.eq(self.dw), # ZDATA_L        [R]
-                   #19: self.reg19.eq(self.dw), # ZDATA_H        [R]
-                   #20: self.reg20.eq(self.dw), # TEMP_L         [R]
-                   #21: self.reg21.eq(self.dw), # TEMP_H         [R]
+                   #8:  self.XDATA.eq( self.dw),         # XDATA          [R]
+                   #9:  self.YDATA.eq( self.dw),         # YDATA          [R]
+                   #10: self.ZDATA.eq(self.dw),          # ZDATA          [R]
+                   #11: self.STATUS.eq(self.dw),         # STATUS         [R]
+                   #12: self.FIFO_ENTRIES_L.eq(self.dw), # FIFO_ENTRIES_L [R]
+                   #13: self.FIFO_ENTRIES_H.eq(self.dw), # FIFO_ENTRIES_H [R]
+                   #14: self.XDATA_L.eq(self.dw),        # XDATA_L        [R]
+                   #15: self.XDATA_H.eq(self.dw),        # XDATA_H        [R]
+                   #16: self.YDATA_L.eq(self.dw),        # YDATA_L        [R]
+                   #17: self.YDATA_H.eq(self.dw),        # YDATA_H        [R]
+                   #18: self.ZDATA_L.eq(self.dw),        # ZDATA_L        [R]
+                   #19: self.ZDATA_H.eq(self.dw),        # ZDATA_H        [R]
+                   #20: self.TEMP_L.eq(self.dw),         # TEMP_L         [R]
+                   #21: self.TEMP_H.eq(self.dw),         # TEMP_H         [R]
 
-                    31: self.reg31.eq(self.dw), # SOFT_RESET     [W]
-                    32: self.reg32.eq(self.dw), # THRESH_ACT_L   [RW]
-                    33: self.reg33.eq(self.dw), # THRESH_ACT_H   [RW]
-                    34: self.reg34.eq(self.dw), # TIME_ACT       [RW]
-                    35: self.reg35.eq(self.dw), # THRESH_INACT_L [RW]
-                    36: self.reg36.eq(self.dw), # THRESH_INACT_H [RW]
-                    37: self.reg37.eq(self.dw), # TIME_INACT_L   [RW]
-                    38: self.reg38.eq(self.dw), # TIME_INACT_H   [RW]
-                    39: self.reg39.eq(self.dw), # ACT_INACT_CTL  [RW]
-                    40: self.reg40.eq(self.dw), # FIFO_CONTROL   [RW]
-                    41: self.reg41.eq(self.dw), # FIFO_SAMPLES   [RW]
-                    42: self.reg42.eq(self.dw), # INTMAP1        [RW]
-                    43: self.reg43.eq(self.dw), # INTMAP2        [RW]
-                    44: self.reg44.eq(self.dw), # FILTER_CTL     [RW]
-                    45: self.reg45.eq(self.dw), # POWER_CTL      [RW]
-                   #46: self.reg46.eq(self.dw), # SELF_TEST      [RW]
+                    31: self.SOFT_RESET.eq(self.dw),     # SOFT_RESET     [W]
+                    32: self.THRESH_ACT_L.eq(self.dw),   # THRESH_ACT_L   [RW]
+                    33: self.THRESH_ACT_H.eq(self.dw),   # THRESH_ACT_H   [RW]
+                    34: self.TIME_ACT.eq(self.dw),       # TIME_ACT       [RW]
+                    35: self.THRESH_INACT_L.eq(self.dw), # THRESH_INACT_L [RW]
+                    36: self.THRESH_INACT_H.eq(self.dw), # THRESH_INACT_H [RW]
+                    37: self.TIME_INACT_L.eq(self.dw),   # TIME_INACT_L   [RW]
+                    38: self.TIME_INACT_H.eq(self.dw),   # TIME_INACT_H   [RW]
+                    39: self.ACT_INACT_CTL.eq(self.dw),  # ACT_INACT_CTL  [RW]
+                    40: self.FIFO_CONTROL.eq(self.dw),   # FIFO_CONTROL   [RW]
+                    41: self.FIFO_SAMPLES.eq(self.dw),   # FIFO_SAMPLES   [RW]
+                    42: self.INTMAP1.eq(self.dw),        # INTMAP1        [RW]
+                    43: self.INTMAP2.eq(self.dw),        # INTMAP2        [RW]
+                    44: self.FILTER_CTL.eq(self.dw),     # FILTER_CTL     [RW]
+                    45: self.POWER_CTL.eq(self.dw),      # POWER_CTL      [RW]
+                   #46: self.SELF_TEST.eq(self.dw),      # SELF_TEST      [RW]
                 })
             )
         ]
@@ -491,14 +491,14 @@ class AccelCore(Module, AutoCSR):
 
         self.comb += [
             self.fifo_axis_level.eq(fifo.level*3),   # fifo.level / 3
-            reg.reg12.eq(self.fifo_axis_level[:8]),  # FIFO_ENTRIES_L
-            reg.reg13.eq(self.fifo_axis_level[8:]),  # FIFO_ENTRIES_H
-            self.fifo_samples[:8].eq(reg.reg41[:8]), # FIFO_SAMPLES (LSB)
-            self.fifo_samples[8:].eq(reg.reg40[3]),  # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
+            reg.FIFO_ENTRIES_L.eq(self.fifo_axis_level[:8]), # FIFO_ENTRIES_L
+            reg.FIFO_ENTRIES_H.eq(self.fifo_axis_level[8:]), # FIFO_ENTRIES_H
+            self.fifo_samples[:8].eq(reg.FIFO_SAMPLES[:8]),  # FIFO_SAMPLES (LSB)
+            self.fifo_samples[8:].eq(reg.FIFO_CONTROL[3]),   # FIFO_SAMPLES (MSB) = FIFO_CONTROL[3] (AH)
         ]
 
         self.sync += [
-            If(reg.reg31 == 0x52, # Soft reset request
+            If(reg.SOFT_RESET == 0x52, # Soft reset request
                reg.reset.eq(1),
             ).Else(
                reg.reset.eq(0),
@@ -506,22 +506,22 @@ class AccelCore(Module, AutoCSR):
         ]
 
         self.sync += [
-            reg.reg11[3].eq(fifo.level>=FIFO_DEPTH), # FIFO_OVERRUN
+            reg.STATUS[3].eq(fifo.level>=FIFO_DEPTH), # FIFO_OVERRUN
             If(self.fifo_axis_level >= self.fifo_samples,
-                reg.reg11[2].eq(1),                  # FIFO_WATERMARK is set
-                pads.led.eq(1),                      # LED debug on
+                reg.STATUS[2].eq(1),                  # FIFO_WATERMARK is set
+                pads.led.eq(1),                       # LED debug on
             ),
             #If((2*self.fifo_axis_level) <= self.fifo_samples,
-            #    reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
+            #    reg.STATUS[2].eq(0),                 # FIFO_WATERMARK is cleared
             #    pads.led.eq(0),                      # LED debug off
             #),
             If(3*self.fifo_entry_read_cnt >= self.fifo_samples,
-                self.fifo_entry_read_cnt.eq(0),      # Reset FIFO entry read counter
-                reg.reg11[2].eq(0),                  # FIFO_WATERMARK is cleared
-                pads.led.eq(0),                      # LED debug off
+                self.fifo_entry_read_cnt.eq(0),       # Reset FIFO entry read counter
+                reg.STATUS[2].eq(0),                  # FIFO_WATERMARK is cleared
+                pads.led.eq(0),                       # LED debug off
             ),
-            reg.reg11[1].eq(fifo.level>=1),          # FIFO_READY (at least one valid sample in the FIFO buffer)
-            reg.reg11[0].eq(fifo.level>=1),          # DATA_READY (new valid sample available) (not implement)
+            reg.STATUS[1].eq(fifo.level>=1),          # FIFO_READY (at least one valid sample in the FIFO buffer)
+            reg.STATUS[0].eq(fifo.level>=1),          # DATA_READY (new valid sample available) (not implement)
         ]
 
         # Add output data rate controller
@@ -530,13 +530,13 @@ class AccelCore(Module, AutoCSR):
 
         # Connect to ODR parametter input
         self.comb += [
-            odrctrl.odr.eq(reg.reg44[:3]),           # ODR[2:0] (FILTER_CTL)
+            odrctrl.odr.eq(reg.FILTER_CTL[:3]),       # ODR[2:0] (FILTER_CTL)
         ]
 
         # ODR controller
         self.sync += [
-            If(reg.reg45[:2] == 0x02,                # MEASURE[1:0] = 0x02 (POWER_CTL)
-                #If(reg.reg11[2],                     # And FIFO_WATERMARK is cleared
+            If(reg.POWER_CTL[:2] == 0x02,             # MEASURE[1:0] = 0x02 (POWER_CTL)
+                #If(reg.STATUS[2],                    # And FIFO_WATERMARK is cleared
                 #    odrctrl.ena.eq(0)
                 #).Else(
                 #    odrctrl.ena.eq(1)
@@ -550,16 +550,16 @@ class AccelCore(Module, AutoCSR):
         # Interrupt signaling
         self.comb += [
             # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP1 are set
-            If(~reg.reg42[7],
-                pads.int1.eq(reg.reg42[2] & reg.reg11[2]),   # Active high
+            If(~reg.INTMAP1[7],
+                pads.int1.eq(reg.INTMAP1[2] & reg.STATUS[2]),   # Active high
             ).Else(
-                pads.int1.eq(~reg.reg42[2] | ~reg.reg11[2]), # Active low
+                pads.int1.eq(~reg.INTMAP1[2] | ~reg.STATUS[2]), # Active low
             ),
             # Both 2 bits FIFO_WATERMARK in STATUS & INTMAP2 are set
-            If(~reg.reg43[7],
-                pads.int2.eq(reg.reg43[2] & reg.reg11[2]),   # Active high
+            If(~reg.INTMAP2[7],
+                pads.int2.eq(reg.INTMAP2[2] & reg.STATUS[2]),   # Active high
             ).Else(
-                pads.int2.eq(~reg.reg43[2] | ~reg.reg11[2]), # Active low
+                pads.int2.eq(~reg.INTMAP2[2] | ~reg.STATUS[2]), # Active low
             )
         ]
 
@@ -590,7 +590,7 @@ class AccelCore(Module, AutoCSR):
         # CSR fifo full status
         self.comb += [
             # FIFO full detect implementation (except FIFO stream mode)
-            self.soc2ip_full.status.eq((fifo.level >= FIFO_DEPTH) & (reg.reg40[:2] != 0x02))
+            self.soc2ip_full.status.eq((fifo.level >= FIFO_DEPTH) & (reg.FIFO_CONTROL[:2] != 0x02))
         ]
 
         # Transfer data csrfifo to accel fifo
@@ -601,7 +601,7 @@ class AccelCore(Module, AutoCSR):
         ffsm.act("IDLE",
             If(soc2ip_we_edt.r,
                 NextValue(self.soc2ip_done.status, 0), # clear done flag
-                If(reg.reg40[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
+                If(reg.FIFO_CONTROL[:2] == 0x02, # FIFO_MODE = 0x02, stream mode
                     NextValue(fifo.din[0:16], self.soc2ip_dx.storage),
                     NextValue(fifo.din[16:32], self.soc2ip_dy.storage),
                     NextValue(fifo.din[32:48], self.soc2ip_dz.storage),
