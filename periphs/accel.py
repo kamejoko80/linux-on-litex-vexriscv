@@ -310,9 +310,13 @@ class AccelCore(Module, AutoCSR):
             If(self.str_cmd == 0x0A, # Reg write
                 NextState("REG_VALUE_SHIFTIN"),
             ).Elif(self.str_cmd == 0x0B, # Reg read
-                NextValue(self.bus_addr, self.str_addr),
-                NextValue(self.bus_r, 1),
-                NextState("LOAD_SHIFT_OUT_DATA"),
+                If((self.str_addr >= 14) & (self.str_addr <= 19), # Read X, Y, Z registers
+                    NextState("READ_FIFO"),
+                ).Else( # Read other registers
+                    NextValue(self.bus_addr, self.str_addr),
+                    NextValue(self.bus_r, 1),
+                    NextState("LOAD_SHIFT_OUT_DATA"),
+                ),
             ).Else(
                 NextState("IDLE"),
             )
@@ -372,9 +376,13 @@ class AccelCore(Module, AutoCSR):
                     NextValue(fifo.re, 1),
                     NextState("READ_FIFO_ENTRY_STROBE"),
                 )
-            ).Else(
-                NextState("PREPARE_SHIFT_BYTE_OUT"),
-            )
+            ).Elif(self.str_cmd == 0x0D, # Read FIFO command
+                NextState("PREPARE_SHIFT_FIFO_BYTE_OUT"),
+            ).Elif(self.str_cmd == 0x0B, # Read X, Y, Z registers
+                NextState("PREPARE_SHIFT_XYZ_BYTE_OUT"),
+            ).Else( # Invalid state
+                NextState("IDLE"),
+            ),
         )
         fsm.act("READ_FIFO_ENTRY_STROBE",
             NextValue(fifo.re, 0),
@@ -384,37 +392,119 @@ class AccelCore(Module, AutoCSR):
             NextValue(self.fifo_entry_read_cnt, self.fifo_entry_read_cnt + 1),
             NextValue(self.fifo_byte_sent, 1),
             NextValue(self.fifo_entry, fifo.dout),
-            NextState("PREPARE_SHIFT_BYTE_OUT"),
+            If(self.str_cmd == 0x0D, # Read FIFO command
+                NextState("PREPARE_SHIFT_FIFO_BYTE_OUT"),
+            ).Elif(self.str_cmd == 0x0B, # Read X, Y, Z registers
+                NextState("PREPARE_SHIFT_XYZ_BYTE_OUT"),
+            ).Else( # Invalid state
+                NextState("IDLE"),
+            ),
         )
-        fsm.act("PREPARE_SHIFT_BYTE_OUT",
+        fsm.act("PREPARE_SHIFT_XYZ_BYTE_OUT",
+            If(self.str_addr == 14, # XL
+                If(self.fifo_byte_sent <= 1,
+                    NextValue(self.fifo_byte_sent, 1),
+                    NextValue(self.tx_buf, self.fifo_entry[0:8]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Elif(self.str_addr == 15, # XH
+                If(self.fifo_byte_sent <= 2,
+                    NextValue(self.fifo_byte_sent, 2),
+                    NextValue(self.tx_buf, self.fifo_entry[8:16]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Elif(self.str_addr == 16, # YL
+                If(self.fifo_byte_sent <= 3,
+                    NextValue(self.fifo_byte_sent, 3),
+                    NextValue(self.tx_buf, self.fifo_entry[16:24]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Elif(self.str_addr == 17, # YH
+                If(self.fifo_byte_sent <= 4,
+                    NextValue(self.fifo_byte_sent, 4),
+                    NextValue(self.tx_buf, self.fifo_entry[24:32]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Elif(self.str_addr == 18, # ZL
+                If(self.fifo_byte_sent <= 5,
+                    NextValue(self.fifo_byte_sent, 5),
+                    NextValue(self.tx_buf, self.fifo_entry[32:40]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Elif(self.str_addr == 19, # ZH
+                If(self.fifo_byte_sent <= 6,
+                    NextValue(self.fifo_byte_sent, 6),
+                    NextValue(self.tx_buf, self.fifo_entry[40:48]),
+                    NextState("SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                    NextState("READ_FIFO"),
+                ),
+            ).Else( # self.str_addr exceeds 19
+                NextValue(self.bus_addr, self.str_addr),
+                NextState("SHIFT_OUT_DONE"),
+            ),
+        )
+        fsm.act("SHIFT_XYZ_BYTE_OUT",
+            If(self.rxc, # Just wait for byte shifting
+                If(self.fifo_byte_sent < 6,
+                    NextValue(self.fifo_byte_sent, self.fifo_byte_sent + 1),
+                ).Else(
+                    NextValue(self.fifo_byte_sent, 0),
+                ),
+                If(self.str_addr < 19,
+                    NextValue(self.str_addr, self.str_addr + 1),
+                    NextState("PREPARE_SHIFT_XYZ_BYTE_OUT"),
+                ).Else(
+                    NextValue(self.bus_addr, self.str_addr),
+                    NextState("SHIFT_OUT_DONE"),
+                )
+            ),
+        )
+        fsm.act("PREPARE_SHIFT_FIFO_BYTE_OUT",
             If(self.fifo_byte_sent == 1,
                 NextValue(self.tx_buf, self.fifo_entry[0:8]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent == 2,
                 NextValue(self.tx_buf, self.fifo_entry[8:16]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent == 3,
                 NextValue(self.tx_buf, self.fifo_entry[16:24]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent == 4,
                 NextValue(self.tx_buf, self.fifo_entry[24:32]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent == 5,
                 NextValue(self.tx_buf, self.fifo_entry[32:40]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent == 6,
                 NextValue(self.tx_buf, self.fifo_entry[40:48]),
-                NextState("SHIFT_BYTE_OUT"),
+                NextState("SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.fifo_byte_sent >= 7,
                 NextValue(self.fifo_byte_sent, 0),
                 NextState("READ_FIFO"),
-            )
+            ),
         )
-        fsm.act("SHIFT_BYTE_OUT",
+        fsm.act("SHIFT_FIFO_BYTE_OUT",
             If(self.rxc, # Just wait for byte shifting
                 NextValue(self.fifo_byte_sent, self.fifo_byte_sent + 1),
-                NextState("PREPARE_SHIFT_BYTE_OUT"),
-            )
+                NextState("PREPARE_SHIFT_FIFO_BYTE_OUT"),
+            ),
         )
 
         # Edge detect signal combinatorial
