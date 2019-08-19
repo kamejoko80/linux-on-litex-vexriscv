@@ -12,6 +12,7 @@ from soc_linux import SoCLinux
 from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
 from soc_ae4gx import SoCAE4GX
+from soc_basys3 import SoCBASYS3
 
 # Board definition----------------------------------------------------------------------------------
 
@@ -54,6 +55,18 @@ class Arty(Board):
             base = int(base, 16)
             print("Flashing {} at 0x{:08x}".format(filename, base))
             prog.flash(base, filename)
+
+# BASYS3 support -------------------------------------------------------------------------------------
+
+class BASYS3(Board):
+    def __init__(self):
+        from litex.boards.targets import basys3
+        Board.__init__(self, basys3.BaseSoC, "serial")
+
+    def load(self):
+        from litex.build.xilinx import VivadoProgrammer
+        prog = VivadoProgrammer()
+        prog.load_bitstream("build/basys3/gateware/top.bit")
 
 # NeTV2 support ------------------------------------------------------------------------------------
 
@@ -227,6 +240,7 @@ class AE4GX(Board):
 supported_boards = {
     # Xilinx
     "arty":         Arty,
+    "basys3":       BASYS3,
     "netv2":        NeTV2,
     "genesys2":     Genesys2,
     "kcu105":       KCU105,
@@ -277,6 +291,8 @@ def main():
             soc = SoCVexRiscv(board.soc_cls, **soc_kwargs)
         elif board_name in ["ae4gx"]:
             soc = SoCAE4GX(board.soc_cls, **soc_kwargs)
+        elif board_name in ["basys3"]:
+            soc = SoCBASYS3(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_up5k_b_evn"]:
