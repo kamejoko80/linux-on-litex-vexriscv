@@ -599,16 +599,16 @@ class AccelCore(Module, AutoCSR):
             reg.STATUS[3].eq(fifo.level>=FIFO_DEPTH), # FIFO_OVERRUN
             If(self.fifo_axis_level >= self.fifo_samples,
                 reg.STATUS[2].eq(1),                  # FIFO_WATERMARK is set
-                pads.led.eq(1),                       # LED debug on
+                pads.led1.eq(1),                      # LED debug on
             ),
             #If((2*self.fifo_axis_level) <= self.fifo_samples,
             #    reg.STATUS[2].eq(0),                 # FIFO_WATERMARK is cleared
-            #    pads.led.eq(0),                      # LED debug off
+            #    pads.led1.eq(0),                     # LED debug off
             #),
             If(3*self.fifo_entry_read_cnt >= self.fifo_samples,
                 self.fifo_entry_read_cnt.eq(0),       # Reset FIFO entry read counter
                 reg.STATUS[2].eq(0),                  # FIFO_WATERMARK is cleared
-                pads.led.eq(0),                       # LED debug off
+                pads.led1.eq(0),                       # LED debug off
             ),
             reg.STATUS[1].eq(fifo.level>=1),          # FIFO_READY (at least one valid sample in the FIFO buffer)
             reg.STATUS[0].eq(fifo.level>=1),          # DATA_READY (new valid sample available) (not implement)
@@ -683,7 +683,54 @@ class AccelCore(Module, AutoCSR):
             self.soc2ip_full.status.eq((fifo.level >= FIFO_DEPTH) & (reg.FIFO_CONTROL[:2] != 0x02))
         ]
 
-        # Transfer data csrfifo to accel fifo
+        # Motion detector definition
+        self.abs_x = Signal(11)
+        self.abs_y = Signal(11)
+        self.abs_z = Signal(11)
+        self.time_act = Signal(8)
+        self.sum_of_square = Signal(20)
+
+        # Active motion detector timer implementation
+        self.sync += [
+            If(odrctrl.foutr,
+                self.time_act.eq(self.time_act + 1),
+            )
+        ]
+
+        # Motion detector behavior implementation
+        act_fsm = FSM(reset_state = "IDLE")
+        self.submodules += act_fsm
+
+        # Motion detector state machine behavior implementation
+        act_fsm.act("IDLE",
+            If(soc2ip_we_edt.r,
+                NextValue(self.abs_x, self.soc2ip_dx.storage[0:11]),
+                NextValue(self.abs_y, self.soc2ip_dy.storage[0:11]),
+                NextValue(self.abs_z, self.soc2ip_dz.storage[0:11]),
+                NextState("ACT_CALCULATING"),
+            ),
+        )
+        act_fsm.act("ACT_CALCULATING",
+            NextValue(self.sum_of_square,
+                      self.abs_x*self.abs_x +
+                      self.abs_y*self.abs_y +
+                      self.abs_z*self.abs_z),
+            NextState("ACT_CHECKING"),
+        )
+        act_fsm.act("ACT_CHECKING",
+            If(self.sum_of_square > 512*512, # x^2 + y^2 + Z^2 > g^2
+                If(self.time_act > 20,       # Active motion detected
+                    NextValue(pads.led2, 1),
+                ),
+            ).Else(
+                NextValue(self.time_act, 0), # Reset the timer
+                NextValue(pads.led2, 0),     # Inactitve motion detected
+            ),
+            NextState("IDLE"),
+        )
+
+
+        # Write data from CSRs to the accel fifo
         ffsm = FSM(reset_state = "IDLE")
         self.submodules += ffsm
 
