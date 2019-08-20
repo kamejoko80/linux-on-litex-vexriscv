@@ -17,48 +17,18 @@ from litex.soc.integration.builder import *
 from litex.soc.interconnect import csr_bus
 from litex.soc.cores.uart import *
 
-def get_common_ios():
-    return [
-        # clk / rst
-        ("clk100", 0, Pins("E3"), IOStandard("LVCMOS33")),
-        ("rst", 0, Pins("C2"), IOStandard("LVCMOS33")),
-
-        ("serial", 0,
-            Subsignal("tx", Pins("D10")),
-            Subsignal("rx", Pins("A9")),
-            IOStandard("LVCMOS33")
-        ),
-    ]
-
-class Platform(XilinxPlatform):
-    def __init__(self):
-        XilinxPlatform.__init__(self, "xc7a35ticsg324-1L", io=[], toolchain="vivado")
+import basys3
 
 class CRG(Module):
     def __init__(self, platform, soc_config):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sys2x = ClockDomain(reset_less=True)
-        self.clock_domains.cd_sys2x_dqs = ClockDomain(reset_less=True)
-        self.clock_domains.cd_iodelay = ClockDomain()
 
-        # # #
+        clk100 = platform.request("clk100")
+        #rst = platform.request("rst")
 
-        clk = platform.request("clk100")
-        rst = platform.request("rst")
+        self.cd_sys.clk.attr.add("keep")
 
-        self.submodules.sys_pll = sys_pll = S7PLL(speedgrade=soc_config["speedgrade"])
-        self.comb += sys_pll.reset.eq(rst)
-        sys_pll.register_clkin(clk, soc_config["input_clk_freq"])
-        sys_pll.create_clkout(self.cd_sys, soc_config["sys_clk_freq"])
-        sys_pll.create_clkout(self.cd_sys2x, 2*soc_config["sys_clk_freq"])
-        sys_pll.create_clkout(self.cd_sys2x_dqs, 2*soc_config["sys_clk_freq"], phase=90)
-        #self.comb += platform.request("pll_locked").eq(sys_pll.locked)
-
-        self.submodules.iodelay_pll = iodelay_pll = S7PLL()
-        self.comb += iodelay_pll.reset.eq(rst)
-        iodelay_pll.register_clkin(clk, soc_config["input_clk_freq"])
-        iodelay_pll.create_clkout(self.cd_iodelay, soc_config["iodelay_clk_freq"])
-        self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_iodelay)
+        self.comb += self.cd_sys.clk.eq(clk100)
 
 class BaseSoC(SoCCore):
     csr_map = {
@@ -79,7 +49,6 @@ class BaseSoC(SoCCore):
     interrupt_map.update(SoCCore.interrupt_map)
 
     def __init__(self, platform, soc_config, **kwargs):
-        platform.add_extension(get_common_ios())
         sys_clk_freq = soc_config["sys_clk_freq"]
         SoCCore.__init__(self, platform, sys_clk_freq,
                          with_uart=True,
@@ -96,7 +65,8 @@ def main():
     exec(open(sys.argv[1]).read(), globals())
 
     # generate core
-    platform = Platform()
+    platform = basys3.Platform()
+
     soc = BaseSoC(platform, soc_config,
                   ident=soc_config["ident"],
                   integrated_rom_size=soc_config["rom_size"],
@@ -108,7 +78,7 @@ def main():
     output_dir = "build/" + soc_config["soc_name"]
     build_name = soc_config["soc_name"] + "_core"
 
-    builder = Builder(soc, output_dir=output_dir , compile_gateware=True)
+    builder = Builder(soc, output_dir=output_dir , compile_gateware=False)
     vns = builder.build(build_name=build_name, regular_comb=False)
 
     # prepare core (could be improved)
