@@ -47,10 +47,10 @@ _io = [
     ("serial", 0,
         Subsignal("rx1", Pins("B18")),
         Subsignal("tx1", Pins("A18")),
-        Subsignal("rx2", Pins("U16")),
-        Subsignal("tx2", Pins("E19")),
-        Subsignal("rx3", Pins("U19")),
-        Subsignal("tx3", Pins("V19")),
+        Subsignal("rx2", Pins("K17")), # JC1
+        Subsignal("tx2", Pins("M18")), # JC2
+        Subsignal("rx3", Pins("N17")), # JC3
+        Subsignal("tx3", Pins("P18")), # JC4
         Subsignal("rx4", Pins("W18")),
         Subsignal("tx4", Pins("U15")),
         Subsignal("rx5", Pins("U14")),

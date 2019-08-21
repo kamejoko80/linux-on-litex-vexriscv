@@ -17,18 +17,32 @@ from litex.soc.integration.builder import *
 from litex.soc.interconnect import csr_bus
 from litex.soc.cores.uart import *
 
-import basys3
+def get_common_ios():
+    return [
+        # clk / rst
+        ("clk", 0, Pins(1)),
+        ("rst", 0, Pins(1)),
+
+        # serial
+        ("serial", 0,
+            Subsignal("tx", Pins(1)),
+            Subsignal("rx", Pins(1))
+        ),
+    ]
+
+class Platform(XilinxPlatform):
+    def __init__(self):
+        XilinxPlatform.__init__(self, "xc7a35tcpg236-1", io=[], toolchain="vivado")
 
 class CRG(Module):
     def __init__(self, platform, soc_config):
         self.clock_domains.cd_sys = ClockDomain()
-
-        clk100 = platform.request("clk100")
-        #rst = platform.request("rst")
-
         self.cd_sys.clk.attr.add("keep")
 
-        self.comb += self.cd_sys.clk.eq(clk100)
+        clk = platform.request("clk")
+        rst = platform.request("rst")
+
+        self.comb += self.cd_sys.clk.eq(clk)
 
 class BaseSoC(SoCCore):
     csr_map = {
@@ -49,6 +63,7 @@ class BaseSoC(SoCCore):
     interrupt_map.update(SoCCore.interrupt_map)
 
     def __init__(self, platform, soc_config, **kwargs):
+        platform.add_extension(get_common_ios())
         sys_clk_freq = soc_config["sys_clk_freq"]
         SoCCore.__init__(self, platform, sys_clk_freq,
                          with_uart=True,
@@ -65,7 +80,7 @@ def main():
     exec(open(sys.argv[1]).read(), globals())
 
     # generate core
-    platform = basys3.Platform()
+    platform = Platform()
 
     soc = BaseSoC(platform, soc_config,
                   ident=soc_config["ident"],
