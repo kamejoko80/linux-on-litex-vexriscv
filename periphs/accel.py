@@ -128,7 +128,10 @@ class RegisterArray(Module):
                     8:  self.dr.eq(self.XDATA),          # XDATA          [R]  [0x08]
                     9:  self.dr.eq(self.YDATA),          # YDATA          [R]  [0x09]
                     10: self.dr.eq(self.ZDATA),          # ZDATA          [R]  [0x0A]
-                    11: self.dr.eq(self.STATUS),         # STATUS         [R]  [0x0B]
+                    11:(self.dr.eq(self.STATUS),         # STATUS         [R]  [0x0B]
+                        self.STATUS[4].eq(0),            # Clear ACT flag
+                        self.STATUS[5].eq(0),            # Clear INACT flag
+                        ),
                     12: self.dr.eq(self.FIFO_ENTRIES_L), # FIFO_ENTRIES_L [R]  [0x0C]
                     13: self.dr.eq(self.FIFO_ENTRIES_H), # FIFO_ENTRIES_H [R]  [0x0D]
                     14: self.dr.eq(self.XDATA_L),        # XDATA_L        [R]  [0x0E]
@@ -156,7 +159,7 @@ class RegisterArray(Module):
                     44: self.dr.eq(self.FILTER_CTL),     # FILTER_CTL     [RW] [0x2C]
                     45: self.dr.eq(self.POWER_CTL),      # POWER_CTL      [RW] [0x2D]
                    #46: self.dr.eq(self.SELF_TEST),      # SELF_TEST      [RW] [0x2E]
-             "default": self.dr.eq(0),
+                    "default": self.dr.eq(0),
                 })
             ).Elif(self.w,
                 Case(self.addr, {
@@ -249,12 +252,24 @@ class AccelCore(Module, AutoCSR):
         reg = ResetInserter()(RegisterArray())
         self.submodules += reg
 
+        # Connect register array bus
         self.comb += [
             reg.addr.eq(self.bus_addr),
             reg.r.eq(self.bus_r),
             reg.w.eq(self.bus_w),
             reg.dw.eq(self.bus_dw),
             self.bus_dr.eq(reg.dr),
+        ]
+
+        # LED debug
+        self.comb += [
+            pads.led0.eq(reg.STATUS[0]), # DATA_READY
+            pads.led1.eq(reg.STATUS[1]), # FIFO_READY
+            pads.led2.eq(reg.STATUS[2]), # FIFO_WATERMARK
+            pads.led3.eq(reg.STATUS[3]), # FIFO_OVERRUN
+            pads.led4.eq(reg.STATUS[4]), # ACT
+            pads.led5.eq(reg.STATUS[5]), # INACT
+            pads.led6.eq(reg.STATUS[6]), # AWAKE
         ]
 
         # Connect to the FIFO buffer
@@ -599,7 +614,6 @@ class AccelCore(Module, AutoCSR):
             reg.STATUS[3].eq(fifo.level>=FIFO_DEPTH), # FIFO_OVERRUN
             If(self.fifo_axis_level >= self.fifo_samples,
                 reg.STATUS[2].eq(1),                  # FIFO_WATERMARK is set
-                pads.led1.eq(1),                      # LED debug on
             ),
             #If((2*self.fifo_axis_level) <= self.fifo_samples,
             #    reg.STATUS[2].eq(0),                 # FIFO_WATERMARK is cleared
@@ -608,7 +622,6 @@ class AccelCore(Module, AutoCSR):
             If(3*self.fifo_entry_read_cnt >= self.fifo_samples,
                 self.fifo_entry_read_cnt.eq(0),       # Reset FIFO entry read counter
                 reg.STATUS[2].eq(0),                  # FIFO_WATERMARK is cleared
-                pads.led1.eq(0),                       # LED debug off
             ),
             reg.STATUS[1].eq(fifo.level>=1),          # FIFO_READY (at least one valid sample in the FIFO buffer)
             reg.STATUS[0].eq(fifo.level>=1),          # DATA_READY (new valid sample available) (not implement)
@@ -683,16 +696,24 @@ class AccelCore(Module, AutoCSR):
             self.soc2ip_full.status.eq((fifo.level >= FIFO_DEPTH) & (reg.FIFO_CONTROL[:2] != 0x02))
         ]
 
-        # Motion detector definition
-        self.abs_x = Signal(11)
-        self.abs_y = Signal(11)
-        self.abs_z = Signal(11)
+        ################## Active motion detection ##################
+        self.abs_act_x = Signal(11)
+        self.abs_act_y = Signal(11)
+        self.abs_act_z = Signal(11)
         self.time_act = Signal(8)
-        self.sum_of_square = Signal(20)
+        self.start_act = Signal(1, reset=1)
+        self.thresh_act = Signal(11)
+        self.sum_act = Signal(20)
+
+        # Active motion detector threshold
+        self.comb += [
+            self.thresh_act[0:8].eq(reg.THRESH_ACT_L[0:8]),
+            self.thresh_act[8:11].eq(reg.THRESH_ACT_H[0:3]),
+        ]
 
         # Active motion detector timer implementation
         self.sync += [
-            If(odrctrl.foutr,
+            If(soc2ip_we_edt.r & reg.ACT_INACT_CTL[0] & (self.time_act < 0xFF),
                 self.time_act.eq(self.time_act + 1),
             )
         ]
@@ -701,36 +722,210 @@ class AccelCore(Module, AutoCSR):
         act_fsm = FSM(reset_state = "IDLE")
         self.submodules += act_fsm
 
-        # Motion detector state machine behavior implementation
+        # Active motion detector state machine behavior implementation
         act_fsm.act("IDLE",
+            If(~reg.ACT_INACT_CTL[0],        # ACT_EN[0]
+                NextValue(reg.STATUS[4], 0), # Turn off ACT flag
+                NextValue(self.start_act, 0),
+            ).Elif(self.start_act,
+                NextValue(reg.STATUS[4], 0), # Turn off ACT flag
+                NextValue(self.time_act, 0),
+                NextState("ACT_TRACKING"),
+            ),
+        )
+        act_fsm.act("ACT_TRACKING",
+            NextValue(self.start_act, 0),
             If(soc2ip_we_edt.r,
-                NextValue(self.abs_x, self.soc2ip_dx.storage[0:11]),
-                NextValue(self.abs_y, self.soc2ip_dy.storage[0:11]),
-                NextValue(self.abs_z, self.soc2ip_dz.storage[0:11]),
+                NextValue(self.abs_act_x, self.soc2ip_dx.storage[0:11]),
+                NextValue(self.abs_act_y, self.soc2ip_dy.storage[0:11]),
+                NextValue(self.abs_act_z, self.soc2ip_dz.storage[0:11]),
                 NextState("ACT_CALCULATING"),
             ),
         )
         act_fsm.act("ACT_CALCULATING",
-            NextValue(self.sum_of_square,
-                      self.abs_x*self.abs_x +
-                      self.abs_y*self.abs_y +
-                      self.abs_z*self.abs_z),
-            NextState("ACT_CHECKING"),
+            If(self.start_act,
+                NextState("IDLE"),
+            ).Else(
+                NextValue(self.sum_act,
+                          self.abs_act_x*self.abs_act_x +
+                          self.abs_act_y*self.abs_act_y +
+                          self.abs_act_z*self.abs_act_z),
+                NextState("ACT_CHECKING"),
+            )
         )
         act_fsm.act("ACT_CHECKING",
-            If(self.sum_of_square > 512*512, # x^2 + y^2 + Z^2 > g^2
-                If(self.time_act > 20,       # Active motion detected
-                    NextValue(pads.led2, 1),
+            If(self.start_act,
+                NextState("IDLE"),
+            ).Elif(~reg.ACT_INACT_CTL[1], # (ACT_REF[1]) Current only supports absolute comparision
+                If(self.sum_act > self.thresh_act*self.thresh_act, # x^2 + y^2 + Z^2 > thresh_act^2
+                    If(self.time_act >= reg.TIME_ACT, # Active motion detected
+                        NextValue(reg.STATUS[4], 1),  # Turn on ACT flag
+                        NextState("IDLE"),            # Act detecting finished
+                    ).Else(
+                        NextState("ACT_TRACKING"),    # I'm on the right way, continue tracking
+                    ),
+                ).Else(
+                    NextValue(self.time_act, 0),      # Oop! restart tracking again
+                    NextState("ACT_TRACKING"),
                 ),
             ).Else(
-                NextValue(self.time_act, 0), # Reset the timer
-                NextValue(pads.led2, 0),     # Inactitve motion detected
+                NextState("IDLE"),
             ),
-            NextState("IDLE"),
         )
 
+        ################## Inactive motion detection ##################
+        self.abs_inact_x = Signal(11)
+        self.abs_inact_y = Signal(11)
+        self.abs_inact_z = Signal(11)
+        self.time_inact = Signal(16)
+        self.time_inact_reg = Signal(16)
+        self.start_inact = Signal(1, reset=1)
+        self.thresh_inact = Signal(11)
+        self.sum_inact = Signal(20)
 
-        # Write data from CSRs to the accel fifo
+        # Inactive motion detector threshold
+        self.comb += [
+            self.thresh_inact[0:8].eq(reg.THRESH_INACT_L[0:8]),
+            self.thresh_inact[8:11].eq(reg.THRESH_INACT_H[0:3]),
+            self.time_inact_reg[0:8].eq(reg.TIME_INACT_L[0:8]),
+            self.time_inact_reg[8:16].eq(reg.TIME_INACT_H[0:8]),
+        ]
+
+        # Inactive motion detector timer implementation
+        self.sync += [
+            If(soc2ip_we_edt.r & reg.ACT_INACT_CTL[2] & (self.time_inact < 0xFFFF),
+                self.time_inact.eq(self.time_inact + 1),
+            )
+        ]
+
+        # Inactive motion detector behavior implementation
+        inact_fsm = FSM(reset_state = "IDLE")
+        self.submodules += inact_fsm
+
+        # Motion detector state machine behavior implementation
+        inact_fsm.act("IDLE",
+            If(~reg.ACT_INACT_CTL[2],        # INACT_EN[2]
+                NextValue(reg.STATUS[5], 0), # Turn off INACT flag
+                NextValue(self.start_inact, 0),
+            ).Elif(self.start_inact,
+                NextValue(reg.STATUS[5], 0), # Turn off INACT flag
+                NextValue(self.time_inact, 0),
+                NextState("INACT_TRACKING"),
+            ),
+        )
+        inact_fsm.act("INACT_TRACKING",
+            NextValue(self.start_inact, 0),
+            If(soc2ip_we_edt.r,
+                NextValue(self.abs_inact_x, self.soc2ip_dx.storage[0:11]),
+                NextValue(self.abs_inact_y, self.soc2ip_dy.storage[0:11]),
+                NextValue(self.abs_inact_z, self.soc2ip_dz.storage[0:11]),
+                NextState("INACT_CALCULATING"),
+            ),
+        )
+        inact_fsm.act("INACT_CALCULATING",
+            If(self.start_inact,
+                NextState("IDLE"),
+            ).Else(
+                NextValue(self.sum_inact,
+                          self.abs_inact_x*self.abs_inact_x +
+                          self.abs_inact_y*self.abs_inact_y +
+                          self.abs_inact_z*self.abs_inact_z),
+                NextState("INACT_CHECKING"),
+            )
+        )
+        inact_fsm.act("INACT_CHECKING",
+            If(self.start_inact,
+                NextState("IDLE"),
+            ).Elif(~reg.ACT_INACT_CTL[3], # (INACT_REF[3]) Current only supports absolute comparision
+                If(self.sum_inact < self.thresh_inact*self.thresh_inact, # x^2 + y^2 + Z^2 < thresh_inact^2
+                    If(self.time_act >= self.time_inact_reg, # Inactive motion detected
+                        NextValue(reg.STATUS[5], 1),         # Turn on INACT flag
+                        NextState("IDLE"),                   # Act detecting finished
+                    ).Else(
+                        NextState("INACT_TRACKING"),         # I'm on the right way, continue tracking
+                    ),
+                ).Else(
+                    NextValue(self.time_inact, 0),           # Oop! restart tracking again
+                    NextState("INACT_TRACKING"),
+                ),
+            ).Else(
+                NextState("IDLE"),
+            ),
+        )
+
+        ################## Active/Inactive AWAKE glag efficiency ##################
+
+        # Motion detecting mode FSM implementation
+        dtm_fsm = FSM(reset_state = "IDLE")
+        self.submodules += dtm_fsm
+
+        dtm_fsm.act("IDLE",
+            If(reg.ACT_INACT_CTL[4:6] == 0x01,     # LINK mode
+                NextState("START_LINK_MODE"),
+            ).Elif(reg.ACT_INACT_CTL[4:6] == 0x03, # LOOP mode
+                NextState("START_LOOP_MODE"),
+            ).Else(
+                NextValue(reg.STATUS[6], 1),       # AWAKE = 1 (default)
+            ),
+        )
+        dtm_fsm.act("START_LOOP_MODE",
+            If(reg.STATUS[4],                      # ACT detected
+                NextValue(reg.STATUS[6], 1),       # AWAKE = 1
+                NextValue(self.start_inact, 1),    # start inactive motion detection
+                NextState("INACT_MOTION_DETECT"),
+            ).Elif(reg.STATUS[5],                  # INACT detected
+                NextValue(reg.STATUS[6], 0),       # AWAKE = 0
+                NextValue(self.start_act, 1),      # start active motion detection
+                NextState("ACT_MOTION_DETECT"),
+            ).Else(
+                NextState("IDLE"),
+            )
+        )
+        dtm_fsm.act("INACT_MOTION_DETECT",
+            If(reg.STATUS[5],                      # INACT detected
+                NextValue(reg.STATUS[6], 0),       # AWAKE = 0
+                If(reg.ACT_INACT_CTL[4:6] == 0x03, # LOOP mode
+                    NextValue(self.start_act, 1),  # start active motion detection
+                ).Else(
+                    NextState("IDLE"),
+                ),
+            ),
+        )
+        dtm_fsm.act("ACT_MOTION_DETECT",
+            If(reg.STATUS[4],                      # INACT detected
+                NextValue(reg.STATUS[6], 1),       # AWAKE = 1
+                If(reg.ACT_INACT_CTL[4:6] == 0x03, # LOOP mode
+                    NextValue(self.start_inact, 1),# start inactive motion detection
+                ).Else(
+                    NextState("IDLE"),
+                ),
+            ),
+        )
+        dtm_fsm.act("START_LINK_MODE",
+            If(reg.STATUS[4],                # ACT detected
+                NextValue(reg.STATUS[6], 1), # AWAKE = 1
+                NextState("WAIT_FOR_ACT_CLEAR"),
+            ).Elif(reg.STATUS[5],            # INACT detected
+                NextValue(reg.STATUS[6], 0), # AWAKE = 0
+                NextState("WAIT_FOR_INACT_CLEAR"),
+            ).Else(
+                NextState("IDLE"),
+            ),
+        )
+        dtm_fsm.act("WAIT_FOR_ACT_CLEAR",
+           If(~reg.STATUS[4],
+                NextValue(self.start_inact, 1), # start inactive motion detection
+                NextState("IDLE"),
+           ),
+        )
+        dtm_fsm.act("WAIT_FOR_INACT_CLEAR",
+           If(~reg.STATUS[5],
+                NextValue(self.start_act, 1),   # start active motion detection
+                NextState("IDLE"),
+           ),
+        )
+
+        ################## Write data from CSRs to the accel fifo #################
         ffsm = FSM(reset_state = "IDLE")
         self.submodules += ffsm
 
