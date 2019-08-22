@@ -68,6 +68,13 @@ class BASYS3(Board):
         prog = VivadoProgrammer()
         prog.load_bitstream("build/basys3/gateware/top.bit")
 
+    def flash_gw(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0, "build/basys3/gateware/top.bin")
+
 # NeTV2 support ------------------------------------------------------------------------------------
 
 class NeTV2(Board):
