@@ -968,30 +968,30 @@ class ODRController(Module):
         self.foutr = Signal()
         # Module local signals
         self.fout   = Signal()
-        self.prescaler = Signal(max=int(freq/fbase)-1)
-        self.cnt = Signal(max=int(fbase/12.5)-1)
-        self.cpt = Signal(max=int(fbase/12.5)-1)
+        self.prescaler = Signal(max=int(freq/(2*fbase))-1)      # 200Hz counting
+        self.cnt = Signal(5)
+        self.cpt = Signal(5)
 
         # Programmable divider's parametter definition
         self.comb += [
             Case(self.odr, {
-                0:         self.cpt.eq(int(fbase/(12.5*1))-1),  # 12.5 Hz
-                1:         self.cpt.eq(int(fbase/(12.5*2))-1),  # 25   Hz
-                2:         self.cpt.eq(int(fbase/(12.5*4))-1),  # 50   Hz
-                3:         self.cpt.eq(int(fbase/(12.5*8))-1),  # 100  Hz
-                4:         self.cpt.eq(int(fbase/(12.5*16))-1), # 200  Hz
-                "default": self.cpt.eq(0),                      # 400  Hz
+                0:         self.cpt.eq(31), # 12.5 Hz
+                1:         self.cpt.eq(15), # 25   Hz
+                2:         self.cpt.eq(7),  # 50   Hz
+                3:         self.cpt.eq(3),  # 100  Hz
+                4:         self.cpt.eq(1),  # 200  Hz
+                "default": self.cpt.eq(0),  # 400  Hz
             })
         ]
 
         # Programmable clock divider implementation
         self.sync += [
             If(self.ena,
-                If(self.prescaler == int(freq/fbase)-1,
+                If(self.prescaler >= int(freq/(2*fbase))-1,
                     self.prescaler.eq(0),
                     If(self.odr >= 5,
                         self.fout.eq(~self.fout), # Fout = fbase
-                    ).Elif(self.cnt == self.cpt,
+                    ).Elif(self.cnt >= self.cpt,
                         self.cnt.eq(0),
                         self.fout.eq(~self.fout), # Fout = fbase/n
                     ).Else(
@@ -1506,7 +1506,7 @@ def ODRControllerTestBench(dut):
 
     for cycle in range(10000):
 
-        if cycle == 20:
+        if cycle == 2:
             yield dut.ena.eq(1)
             yield dut.odr.eq(3)
 
@@ -1532,7 +1532,7 @@ if __name__ == "__main__":
     #print(verilog.convert(UART(freq=50000000, baud=115200)))
     #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
-    dut = ODRController(freq=8000, fbase=400)
+    dut = ODRController(freq=10000, fbase=400)
     #print(verilog.convert(ODRController(freq=50000000, fbase=400)))
     run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
     #os.system("gtkwave ODRController.vcd")
