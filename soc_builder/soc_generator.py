@@ -34,6 +34,8 @@ def get_common_ios():
             Subsignal("rx", Pins(1))
         ),
 
+        ("gpio_irq", 0, Pins("1")),
+
         # SPI master
         ("spi", 0,
             Subsignal("sclk", Pins(1)),
@@ -87,6 +89,8 @@ class CRG(Module):
             self.cd_sys.rst.eq(rst),
         ]
 
+        platform.add_period_constraint(self.cd_sys.clk, 10)
+
 class BaseSoC(SoCCore):
     csr_map = {
         "ctrl":   0,
@@ -128,6 +132,19 @@ class BaseSoC(SoCCore):
             self.add_csr("accel", 11, allow_user_defined=True)
             self.add_interrupt("accel", 7, allow_user_defined=True)
 
+        if soc_config["platform_name"] in ["accel_test"]:
+            # Integrate SPI master
+            self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
+            self.add_csr("spi_master", 10, allow_user_defined=True)
+            self.add_interrupt("spi_master", 6, allow_user_defined=True)
+            self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
+            spi_master.add_source(self.platform)
+
+            # Integrate int module
+            self.submodules.gpio_isr = GpioISR(self.platform.request("gpio_irq", 0), rissing_edge_detect=False)
+            self.add_csr("gpio_isr", 13, allow_user_defined=True)
+            self.add_interrupt("gpio_isr", 9, allow_user_defined=True)
+
 def main():
     # get config
     if len(sys.argv) < 2:
@@ -167,8 +184,16 @@ def main():
             file.write(filedata)
 
     init_filename = "mem.init"
+    mem_1_init_filename = "mem_1.init"
+    mem_2_init_filename = "mem_2.init"
+
     os.system("mv " + output_dir + "/gateware/mem.init " + output_dir + "/gateware/" + build_name + ".init".format(init_filename))
+    os.system("mv " + output_dir + "/gateware/mem_1.init " + output_dir + "/gateware/" + build_name + "_mem_1" + ".init".format(mem_1_init_filename))
+    os.system("mv " + output_dir + "/gateware/mem_2.init " + output_dir + "/gateware/" + build_name + "_mem_2" + ".init".format(mem_2_init_filename))
+
     replace_in_file(output_dir + "/gateware/" + build_name + ".v", init_filename, build_name + ".init")
+    replace_in_file(output_dir + "/gateware/" + build_name + ".v", mem_1_init_filename, build_name + "_mem_1" + ".init")
+    replace_in_file(output_dir + "/gateware/" + build_name + ".v", mem_2_init_filename, build_name + "_mem_2" + ".init")
 
 if __name__ == "__main__":
     main()
