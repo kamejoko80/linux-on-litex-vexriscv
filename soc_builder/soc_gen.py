@@ -72,13 +72,20 @@ class Platform(XilinxPlatform):
 
 class CRG(Module):
     def __init__(self, platform, soc_config):
-        self.clock_domains.cd_sys = ClockDomain()
-        self.cd_sys.clk.attr.add("keep")
-
         clk = platform.request("clk")
         rst = platform.request("rst")
 
-        self.comb += self.cd_sys.clk.eq(clk)
+        self.clock_domains.cd_sys = ClockDomain()
+        self.cd_sys.clk.attr.add("keep")
+        self.cd_sys.rst.attr.add("keep")
+
+        self.comb += [
+            self.cd_sys.clk.eq(clk),
+        ]
+
+        self.sync += [
+            self.cd_sys.rst.eq(rst),
+        ]
 
 class BaseSoC(SoCCore):
     csr_map = {

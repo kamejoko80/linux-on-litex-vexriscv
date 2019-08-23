@@ -2,9 +2,9 @@
 soc_config = {
 
     # Platform name ------------------------------------------------------------
-    "platform_name": "accel_sim", # Platform name  
+    "platform_name": "accel_sim", # Platform name
     "soc_ident":     "accel_sim", # SoC indentify
- 
+
     # General ------------------------------------------------------------------
     "cpu":         "vexriscv",    # Type of CPU used for init/calib (vexriscv)
     "cpu_variant": "minimal",     # CPU variant

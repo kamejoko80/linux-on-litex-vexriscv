@@ -6,6 +6,7 @@ import struct
 import argparse
 
 from migen import *
+from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_core import *
@@ -20,10 +21,29 @@ class System(Module):
         spi0       = platform.request("spi")
         spi_slave0 = platform.request("spi_slave")
 
+        # POR implementation
+        self.reset = Signal()
+        self.clock_domains.cd_por = ClockDomain()
+        self.reset_delay = Signal(12, reset=4095)
+
+        self.comb += [
+            self.cd_por.clk.eq(clk100),
+        ]
+
+        self.sync.por += [
+            self.reset.eq(self.reset_delay != 0)
+        ]
+
+        self.sync.por += [
+            If(self.reset_delay != 0,
+                self.reset_delay.eq(self.reset_delay - 1)
+            )
+        ]
+
         # Accel sim core
         self.specials += Instance("accel_sim_core",
             i_clk                 = clk100,
-            i_rst                 = 0,
+            i_rst                 = self.reset,
             i_serial_rx           = serial.rx,
             o_serial_tx           = serial.tx,
 
@@ -36,7 +56,7 @@ class System(Module):
 	
             # SPI slave, accel
             i_spi_slave0_sck      = spi_slave0.sck,
-            i_spi_slave0_miso     = spi_slave0.miso,
+           io_spi_slave0_miso     = spi_slave0.miso,
             i_spi_slave0_mosi     = spi_slave0.mosi,
             i_spi_slave0_csn      = spi_slave0.csn,
             o_spi_slave0_int1     = spi_slave0.int1,
