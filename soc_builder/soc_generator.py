@@ -66,6 +66,23 @@ def get_common_ios():
             Subsignal("tx",   Pins(1)),
             Subsignal("rx",   Pins(1)),
         ),
+
+        # MailBox sender interface
+        ("mbx_snd", 0,
+            Subsignal("dout_r", Pins("0 1 2 3 4 5 6 7")),
+            Subsignal("dout_re", Pins(1)),
+            Subsignal("int_r", Pins(1)),
+            Subsignal("int_re",  Pins(1)),
+        ),
+
+        # MailBox sender interface
+        ("mbx_rcv", 0,
+            Subsignal("din_status", Pins("0 1 2 3 4 5 6 7")),
+            Subsignal("readable_status", Pins(1)),
+            Subsignal("rd_r", Pins(1)),
+            Subsignal("rd_re", Pins(1)),
+            Subsignal("int",  Pins(1)),
+        ),
     ]
 
 class Platform(XilinxPlatform):
@@ -132,6 +149,11 @@ class BaseSoC(SoCCore):
             self.add_csr("accel", 11, allow_user_defined=True)
             self.add_interrupt("accel", 7, allow_user_defined=True)
 
+            # Integrate mailbox receiver
+            self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
+            self.add_csr("mbx_rcv", 12, allow_user_defined=True)
+            self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
+
         if soc_config["platform_name"] in ["accel_test"]:
             # Integrate SPI master
             self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
@@ -142,8 +164,12 @@ class BaseSoC(SoCCore):
 
             # Integrate int module
             self.submodules.gpio_isr = GpioISR(self.platform.request("gpio_irq", 0), rissing_edge_detect=False)
-            self.add_csr("gpio_isr", 13, allow_user_defined=True)
-            self.add_interrupt("gpio_isr", 9, allow_user_defined=True)
+            self.add_csr("gpio_isr", 11, allow_user_defined=True)
+            self.add_interrupt("gpio_isr", 7, allow_user_defined=True)
+
+            # Integrate mailbox sender
+            self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
+            self.add_csr("mbx_snd", 12, allow_user_defined=True)
 
 def main():
     # get config

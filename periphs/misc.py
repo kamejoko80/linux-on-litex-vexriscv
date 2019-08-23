@@ -1,6 +1,8 @@
 import os
 
 from migen import *
+from migen.genlib.fifo import SyncFIFOBuffered
+
 from litex.soc.interconnect import wishbone
 from litex.soc.integration.soc_core import mem_decoder
 
@@ -30,11 +32,11 @@ class Adder8(Module, AutoCSR):
         self.sum = CSRStatus(8)
         self.ena = CSRStorage(1, reset = 0)
 
-        self.sync += [ 
+        self.sync += [
             If(self.ena.storage == 1,
                 self.sum.status.eq(self.op1.storage + self.op2.storage),
             )
-        ] 
+        ]
 
 # Simple Uart module
 class MyUart(Module, AutoCSR):
@@ -60,7 +62,7 @@ class MyUart(Module, AutoCSR):
     def add_source(self, platform):
             platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
 
-# Simple wishbone gpio module            
+# Simple wishbone gpio module
 class WbGpio(Module):
     def __init__(self, led):
         self.bus = bus = wishbone.Interface()
@@ -107,7 +109,7 @@ class W2ABridge(Module):
 
 # SJA1000 opencore can controller module
 class SJA1000(Module, AutoCSR):
-    def __init__(self, canif):    
+    def __init__(self, canif):
         # falling edge interrupt
         self.submodules.ev = EventManager()
         self.ev.can_irq = EventSourceProcess()
@@ -133,7 +135,7 @@ class SJA1000(Module, AutoCSR):
                     o_wb_dat_o   = bus.dat_r,
                     i_wb_cyc_i   = bus.cyc,
                     i_wb_stb_i   = bus.stb,
-                    i_wb_we_i    = bus.we, 
+                    i_wb_we_i    = bus.we,
                     i_wb_adr_i   = bus.adr,
                     o_wb_ack_o   = bus.ack,
                     # MISC
@@ -163,7 +165,7 @@ class SJA1000(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/can", "can_register.v"))
 
 # Opencore SPI master
-class SpiMaster(Module, AutoCSR):    
+class SpiMaster(Module, AutoCSR):
     def __init__(self, pads):
         # rissing edge interrupt
         self.submodules.ev = EventManager()
@@ -211,4 +213,61 @@ class SpiMaster(Module, AutoCSR):
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_shift.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "spi_top.v"))
             platform.add_source(os.path.join("periphs/verilog/spi", "timescale.v"))
-     
+
+class MailBox(Module):
+    def __init__(self, fifo_depth=8):
+        self.dout_r = Signal(8)         # CSR(dout)           :r      (i)
+        self.dout_re = Signal()         # CSR(dout)           :re     (i)
+        self.int_r  = Signal()          # CSR(int)            :r      (i)
+        self.int_re = Signal()          # CSR(int)            :re     (i)
+        self.int    = Signal()          # Interrupt notification      (o) 
+        self.din_status = Signal(8)     # CSRStatus(din)      :status (o)
+        self.rd_r = Signal()            # CSR(rd)             :r      (i)
+        self.rd_re = Signal()           # CSR(rd)             :re     (i)
+        self.readable_status = Signal() # CSRStatus(readable) :status (o)
+
+        # Connect to the FIFO buffer
+        fifo = SyncFIFOBuffered(width=8, depth=fifo_depth)
+        self.submodules += fifo
+
+        # Mailbox behavior implementation
+        self.comb += [
+            fifo.din.eq(self.dout_r),
+            fifo.we.eq(self.dout_re),
+            self.int.eq(self.int_r & self.int_re),
+            self.din_status.eq(fifo.dout),
+            fifo.re.eq(self.rd_r & self.rd_re),
+            self.readable_status.eq(fifo.readable),
+        ]
+
+class MailBoxSenderInf(Module, AutoCSR):
+    def __init__(self, pads):
+        self.dout     = CSR(8)
+        self.int      = CSR()
+
+        self.comb += [
+            pads.dout_r.eq(self.dout.r),
+            pads.dout_re.eq(self.dout.re),
+            pads.int_r.eq(self.int.r),
+            pads.int_re.eq(self.int.re),
+        ]
+
+class MailBoxReceiverInf(Module, AutoCSR):
+    def __init__(self, pads):
+        self.din      = CSRStatus(8)
+        self.readable = CSRStatus()
+        self.rd       = CSR()
+
+        # Rising edge interrupt
+        self.submodules.ev = EventManager()
+        self.ev.mbx_int = EventSourcePulse()
+        self.ev.finalize()
+
+        self.comb += [
+            pads.rd_r.eq(self.rd.r),
+            pads.rd_re.eq(self.rd.re),
+            self.din.status.eq(pads.din_status),
+            self.readable.status.eq(pads.readable_status),
+            self.ev.mbx_int.trigger.eq(pads.int),
+        ]
+        

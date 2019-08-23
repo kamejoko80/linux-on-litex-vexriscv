@@ -14,6 +14,10 @@ from litex.soc.integration.builder import *
 
 from litex.boards.platforms import basys3
 
+sys.path.append('../')
+
+from periphs.misc import *
+
 class System(Module):
     def __init__(self, platform):
         serial      = platform.request("serial")
@@ -22,16 +26,22 @@ class System(Module):
         spi0        = platform.request("spi")
         spi_slave0  = platform.request("spi_slave")
 
+        self.clock_domains.cd_sys = ClockDomain()
+        self.cd_sys.clk.attr.add("keep")
+        self.cd_sys.rst.attr.add("keep")
+        
         # POR implementation
         self.reset = Signal()
         self.clock_domains.cd_por = ClockDomain()
         self.reset_delay = Signal(12, reset=4095)
 
         self.comb += [
+            self.cd_sys.clk.eq(clk100),
             self.cd_por.clk.eq(clk100),
         ]
 
         self.sync.por += [
+            self.cd_sys.rst.eq(self.reset_delay != 0),
             self.reset.eq(self.reset_delay != 0)
         ]
 
@@ -47,6 +57,9 @@ class System(Module):
         self.spi_test_mosi = Signal()
         self.spi_test_csn  = Signal()
         self.accel_int1    = Signal()
+
+        # Mailbox implementation
+        self.submodules.mbx = mbx = MailBox()
 
         # Accel simulator core
         self.specials += Instance("accel_sim_core",
@@ -82,6 +95,13 @@ class System(Module):
             # Accel uart
             #i_spi_slave0_tx      = spi_slave0.tx,
             #i_spi_slave0_rx      = spi_slave0.rx,
+
+            # Mailbox receiver
+            i_mbx_rcv0_din_status      = mbx.din_status,
+            i_mbx_rcv0_readable_status = mbx.readable_status,
+            o_mbx_rcv0_rd_r            = mbx.rd_r,
+            o_mbx_rcv0_rd_re           = mbx.rd_re,
+            i_mbx_rcv0_int             = mbx.int,
         )
 
         # Accel test core
@@ -98,6 +118,12 @@ class System(Module):
             o_spi0_csn            = self.spi_test_csn,
            #i_spi0_irq
             i_gpio_irq0           = self.accel_int1,
+
+            # Mailbox sender
+            o_mbx_snd0_dout_r     = mbx.dout_r,
+            o_mbx_snd0_dout_re    = mbx.dout_re,
+            o_mbx_snd0_int_r      = mbx.int_r,
+            o_mbx_snd0_int_re     = mbx.int_re,
         )
 
         # Accel simulator core
