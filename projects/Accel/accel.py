@@ -585,29 +585,6 @@ class ODRController(Module):
             self.foutr.eq(edt.r),
         ]
 
-class SyncFIFOTest(Module):
-    def __init__(self, width, depth):
-        self.din = Signal(width)
-        self.dout = Signal(width)
-        self.level = Signal(max=depth+2)
-        self.writable = Signal()
-        self.readable = Signal()
-        self.we = Signal()
-        self.re = Signal()
-
-        fifo = SyncFIFOBuffered(width, depth)
-        self.submodules += fifo
-
-        self.comb += [
-            fifo.din.eq(self.din),
-            self.dout.eq(fifo.dout),
-            self.level.eq(fifo.level),
-            self.writable.eq(fifo.writable),
-            self.readable.eq(fifo.readable),
-            fifo.we.eq(self.we),
-            fifo.re.eq(self.re),
-        ]
-
 class UART(Module):
     # freg  : sys_clk frequency
     # baud  : Uart baud rate
@@ -759,6 +736,99 @@ class UART(Module):
             self.readable.eq(self.rxsampling & (self.rxbitcnt == 8)),
             self.writable.eq(~self.tx_ena),
         ]
+
+class SyncFIFOTest(Module):
+    def __init__(self, width, depth):
+        self.din = Signal(width)
+        self.dout = Signal(width)
+        self.level = Signal(max=depth+2)
+        self.writable = Signal()
+        self.readable = Signal()
+        self.we = Signal()
+        self.re = Signal()
+
+        fifo = SyncFIFOBuffered(width, depth)
+        self.submodules += fifo
+
+        self.comb += [
+            fifo.din.eq(self.din),
+            self.dout.eq(fifo.dout),
+            self.level.eq(fifo.level),
+            self.writable.eq(fifo.writable),
+            self.readable.eq(fifo.readable),
+            fifo.we.eq(self.we),
+            fifo.re.eq(self.re),
+        ]
+
+def SyncFIFOTestTestBench(dut):
+    # Note:
+    # To read FIFO, first FIFO entry is always available
+    # Read fifo.dout for first FIFO entry before assert fifo.re for the next FIFO entries
+    # otherwise first FIFO entry will be missed.
+    for cycle in range(1000):
+
+        if cycle == 3:
+            yield dut.din.eq(0xA3)
+
+        if cycle == 4:
+            yield dut.din.eq(0xA4)
+
+        if cycle == 5:
+            yield dut.din.eq(0xA5)
+
+        if cycle == 6:
+            yield dut.din.eq(0x00)
+
+        if cycle == 3:
+            yield dut.we.eq(1)
+
+        if cycle == 5:
+            yield dut.we.eq(1)
+
+        if cycle == 6:
+            yield dut.we.eq(0)
+
+        if cycle == 7:
+            yield dut.re.eq(1)
+
+        if cycle == 8:
+            yield dut.re.eq(1)
+
+        if cycle == 9:
+            yield dut.re.eq(1)
+
+        if cycle == 10:
+            yield dut.re.eq(1)
+
+        if cycle == 11:
+            yield dut.re.eq(0)
+
+        if cycle == 12:
+            yield dut.din.eq(0x11)
+            yield dut.we.eq(1)
+
+        if cycle == 13:
+            yield dut.din.eq(0x22)
+            yield dut.we.eq(1)
+
+        if cycle == 14:
+            yield dut.din.eq(0x33)
+            yield dut.we.eq(1)
+
+        if cycle == 15:
+            yield dut.we.eq(0)
+            yield dut.re.eq(1)
+
+        if cycle == 16:
+            yield dut.re.eq(1)
+
+        if cycle == 17:
+            yield dut.re.eq(1)
+
+        if cycle == 18:
+            yield dut.re.eq(0)
+
+        yield
 
 def SpiSlaveTestBench(dut):
     cnt1 = 0
@@ -989,38 +1059,6 @@ def UARTWriteFIFOTestBench(dut):
 
         yield
 
-def SyncFIFOTestTestBench(dut):
-
-    for cycle in range(1000):
-
-        if cycle == 3:
-            yield dut.din.eq(0xA3)
-
-        if cycle == 4:
-            yield dut.din.eq(0xA4)
-
-        if cycle == 5:
-            yield dut.din.eq(0xA5)
-
-        if cycle == 6:
-            yield dut.din.eq(0x00)
-
-        if cycle == 3:
-            yield dut.we.eq(1)
-
-        if cycle == 5:
-            yield dut.we.eq(1)
-
-        if cycle == 6:
-            yield dut.we.eq(0)
-
-        if cycle > 7:
-            yield dut.re.eq(1)
-        else:
-            yield dut.re.eq(0)
-
-        yield
-
 def UARTTestBench(dut):
 
     r = 100  # Over sampling ratio
@@ -1098,17 +1136,17 @@ if __name__ == "__main__":
     #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
     #os.system("gtkwave SyncFIFOTest.vcd")
 
-    #dut = SyncFIFOBuffered(width=8, depth=2)
+    dut = SyncFIFOBuffered(width=8, depth=4)
     #print(verilog.convert(SyncFIFOTest(width=8, depth=2)))
-    #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
+    run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
     #os.system("gtkwave SyncFIFOTest.vcd")
 
     #dut = UART(freq=50000000, baud=115200)
     #print(verilog.convert(UART(freq=50000000, baud=115200)))
     #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")
 
-    dut = ODRController(freq=10000, fbase=400)
+    #dut = ODRController(freq=10000, fbase=400)
     #print(verilog.convert(ODRController(freq=50000000, fbase=400)))
-    run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
+    #run_simulation(dut, ODRControllerTestBench(dut), clocks={"sys": 10}, vcd_name="ODRController.vcd")
     #os.system("gtkwave ODRController.vcd")
   
