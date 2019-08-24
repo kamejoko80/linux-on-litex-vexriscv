@@ -78,7 +78,7 @@ def get_common_ios():
         # MailBox sender interface
         ("mbx_rcv", 0,
             Subsignal("din_status", Pins("0 1 2 3 4 5 6 7")),
-            Subsignal("readable_status", Pins(1)),
+            Subsignal("len_status", Pins("0 1 2 3 4 5 6 7")),
             Subsignal("rd_r", Pins(1)),
             Subsignal("rd_re", Pins(1)),
             Subsignal("int",  Pins(1)),
@@ -149,9 +149,13 @@ class BaseSoC(SoCCore):
             self.add_csr("accel", 11, allow_user_defined=True)
             self.add_interrupt("accel", 7, allow_user_defined=True)
 
+            # Integrate mailbox sender
+            self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
+            self.add_csr("mbx_snd", 12, allow_user_defined=True)
+
             # Integrate mailbox receiver
             self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
-            self.add_csr("mbx_rcv", 12, allow_user_defined=True)
+            self.add_csr("mbx_rcv", 13, allow_user_defined=True)
             self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
 
         if soc_config["platform_name"] in ["accel_test"]:
@@ -170,6 +174,11 @@ class BaseSoC(SoCCore):
             # Integrate mailbox sender
             self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
             self.add_csr("mbx_snd", 12, allow_user_defined=True)
+
+            # Integrate mailbox receiver
+            self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
+            self.add_csr("mbx_rcv", 13, allow_user_defined=True)
+            self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
 
 def main():
     # get config

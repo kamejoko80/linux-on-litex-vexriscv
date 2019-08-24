@@ -29,7 +29,7 @@ class System(Module):
         self.clock_domains.cd_sys = ClockDomain()
         self.cd_sys.clk.attr.add("keep")
         self.cd_sys.rst.attr.add("keep")
-        
+
         # POR implementation
         self.reset = Signal()
         self.clock_domains.cd_por = ClockDomain()
@@ -59,7 +59,8 @@ class System(Module):
         self.accel_int1    = Signal()
 
         # Mailbox implementation
-        self.submodules.mbx = mbx = MailBox()
+        self.submodules.mbx1 = mbx1 = MailBox(fifo_depth=32)
+        self.submodules.mbx2 = mbx2 = MailBox(fifo_depth=32)
 
         # Accel simulator core
         self.specials += Instance("accel_sim_core",
@@ -96,12 +97,18 @@ class System(Module):
             #i_spi_slave0_tx      = spi_slave0.tx,
             #i_spi_slave0_rx      = spi_slave0.rx,
 
+            # Mailbox sender
+            o_mbx_snd0_dout_r     = mbx1.dout_r,
+            o_mbx_snd0_dout_re    = mbx1.dout_re,
+            o_mbx_snd0_int_r      = mbx1.int_r,
+            o_mbx_snd0_int_re     = mbx1.int_re,
+
             # Mailbox receiver
-            i_mbx_rcv0_din_status      = mbx.din_status,
-            i_mbx_rcv0_readable_status = mbx.readable_status,
-            o_mbx_rcv0_rd_r            = mbx.rd_r,
-            o_mbx_rcv0_rd_re           = mbx.rd_re,
-            i_mbx_rcv0_int             = mbx.int,
+            i_mbx_rcv0_din_status = mbx2.din_status,
+            i_mbx_rcv0_len_status = mbx2.len_status,
+            o_mbx_rcv0_rd_r       = mbx2.rd_r,
+            o_mbx_rcv0_rd_re      = mbx2.rd_re,
+            i_mbx_rcv0_int        = mbx2.int,
         )
 
         # Accel test core
@@ -120,10 +127,17 @@ class System(Module):
             i_gpio_irq0           = self.accel_int1,
 
             # Mailbox sender
-            o_mbx_snd0_dout_r     = mbx.dout_r,
-            o_mbx_snd0_dout_re    = mbx.dout_re,
-            o_mbx_snd0_int_r      = mbx.int_r,
-            o_mbx_snd0_int_re     = mbx.int_re,
+            o_mbx_snd0_dout_r     = mbx2.dout_r,
+            o_mbx_snd0_dout_re    = mbx2.dout_re,
+            o_mbx_snd0_int_r      = mbx2.int_r,
+            o_mbx_snd0_int_re     = mbx2.int_re,
+
+            # Mailbox receiver
+            i_mbx_rcv0_din_status = mbx1.din_status,
+            i_mbx_rcv0_len_status = mbx1.len_status,
+            o_mbx_rcv0_rd_r       = mbx1.rd_r,
+            o_mbx_rcv0_rd_re      = mbx1.rd_re,
+            i_mbx_rcv0_int        = mbx1.int,
         )
 
         # Accel simulator core

@@ -220,11 +220,11 @@ class MailBox(Module):
         self.dout_re = Signal()         # CSR(dout)           :re     (i)
         self.int_r  = Signal()          # CSR(int)            :r      (i)
         self.int_re = Signal()          # CSR(int)            :re     (i)
-        self.int    = Signal()          # Interrupt notification      (o) 
+        self.int    = Signal()          # Interrupt notification      (o)
         self.din_status = Signal(8)     # CSRStatus(din)      :status (o)
         self.rd_r = Signal()            # CSR(rd)             :r      (i)
         self.rd_re = Signal()           # CSR(rd)             :re     (i)
-        self.readable_status = Signal() # CSRStatus(readable) :status (o)
+        self.len_status = Signal(8)     # CSRStatus(level)    :status (o)
 
         # Connect to the FIFO buffer
         fifo = SyncFIFOBuffered(width=8, depth=fifo_depth)
@@ -237,7 +237,7 @@ class MailBox(Module):
             self.int.eq(self.int_r & self.int_re),
             self.din_status.eq(fifo.dout),
             fifo.re.eq(self.rd_r & self.rd_re),
-            self.readable_status.eq(fifo.readable),
+            self.len_status.eq(fifo.level),
         ]
 
 class MailBoxSenderInf(Module, AutoCSR):
@@ -255,7 +255,7 @@ class MailBoxSenderInf(Module, AutoCSR):
 class MailBoxReceiverInf(Module, AutoCSR):
     def __init__(self, pads):
         self.din      = CSRStatus(8)
-        self.readable = CSRStatus()
+        self.len      = CSRStatus(8)
         self.rd       = CSR()
 
         # Rising edge interrupt
@@ -267,7 +267,7 @@ class MailBoxReceiverInf(Module, AutoCSR):
             pads.rd_r.eq(self.rd.r),
             pads.rd_re.eq(self.rd.re),
             self.din.status.eq(pads.din_status),
-            self.readable.status.eq(pads.readable_status),
+            self.len.status.eq(pads.len_status),
             self.ev.mbx_int.trigger.eq(pads.int),
         ]
         
