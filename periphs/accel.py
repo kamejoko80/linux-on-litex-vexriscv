@@ -295,7 +295,8 @@ class AccelCore(Module, AutoCSR):
             If(~pads.csn,
                 NextValue(self.tx_buf, 0),
                 NextState("CMD_PHASE"),
-            )
+            ),
+            NextValue(fifo.re, 0),
         )
         fsm.act("CMD_PHASE",
             If(self.rxc,
@@ -388,9 +389,8 @@ class AccelCore(Module, AutoCSR):
         fsm.act("READ_FIFO",
             If(self.fifo_byte_sent == 0,
                 If(fifo.readable,
-                    NextValue(fifo.re, 1),
-                    NextState("READ_FIFO_ENTRY_STROBE"),
-                )
+                    NextState("READ_FIFO_ENTRY"),
+                ),
             ).Elif(self.str_cmd == 0x0D, # Read FIFO command
                 NextState("PREPARE_SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.str_cmd == 0x0B, # Read X, Y, Z registers
@@ -399,14 +399,11 @@ class AccelCore(Module, AutoCSR):
                 NextState("IDLE"),
             ),
         )
-        fsm.act("READ_FIFO_ENTRY_STROBE",
-            NextValue(fifo.re, 0),
-            NextState("READ_FIFO_ENTRY"),
-        )
         fsm.act("READ_FIFO_ENTRY",
             NextValue(self.fifo_entry_read_cnt, self.fifo_entry_read_cnt + 1),
             NextValue(self.fifo_byte_sent, 1),
-            NextValue(self.fifo_entry, fifo.dout),
+            NextValue(self.fifo_entry, fifo.dout), # Read FIFO entry
+            NextValue(fifo.re, 1), # Read strobe for next entry
             If(self.str_cmd == 0x0D, # Read FIFO command
                 NextState("PREPARE_SHIFT_FIFO_BYTE_OUT"),
             ).Elif(self.str_cmd == 0x0B, # Read X, Y, Z registers
@@ -416,6 +413,7 @@ class AccelCore(Module, AutoCSR):
             ),
         )
         fsm.act("PREPARE_SHIFT_XYZ_BYTE_OUT",
+            NextValue(fifo.re, 0),
             If(self.str_addr == 14, # XL
                 If(self.fifo_byte_sent <= 1,
                     NextValue(self.fifo_byte_sent, 1),
@@ -492,6 +490,7 @@ class AccelCore(Module, AutoCSR):
             ),
         )
         fsm.act("PREPARE_SHIFT_FIFO_BYTE_OUT",
+            NextValue(fifo.re, 0),
             If(self.fifo_byte_sent == 1,
                 NextValue(self.tx_buf, self.fifo_entry[0:8]),
                 NextState("SHIFT_FIFO_BYTE_OUT"),
