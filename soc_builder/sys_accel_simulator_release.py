@@ -14,6 +14,10 @@ from litex.soc.integration.builder import *
 
 from litex.boards.platforms import basys3
 
+sys.path.append('../')
+
+from periphs.misc import *
+
 class System(Module):
     def __init__(self, platform):
         serial     = platform.request("serial")
@@ -41,7 +45,7 @@ class System(Module):
         ]
 
         # Accel sim core
-        self.specials += Instance("accel_sim_core",
+        self.specials += Instance("accel_sim_release_core",
             i_clk                 = clk100,
             i_rst                 = self.reset,
             i_serial_rx           = serial.rx,
@@ -53,7 +57,7 @@ class System(Module):
             o_spi0_mosi           = spi0.mosi,
             o_spi0_csn            = spi0.csn,
            #i_spi0_irq            = spi0.irq,
-	
+
             # SPI slave, accel
             i_spi_slave0_sck      = spi_slave0.sck,
            io_spi_slave0_miso     = spi_slave0.miso,
@@ -76,10 +80,10 @@ class System(Module):
             #i_spi_slave0_rx      = spi_slave0.rx,
         )
 
-        platform.add_source(os.path.join("build/accel_sim/gateware", "accel_sim_core.v"))
-        platform.add_source(os.path.join("build/accel_sim/gateware", "accel_sim_core.init"))
-        platform.add_source(os.path.join("build/accel_sim/gateware", "accel_sim_core_mem_1.init"))
-        platform.add_source(os.path.join("build/accel_sim/gateware", "accel_sim_core_mem_2.init"))
+        platform.add_source(os.path.join("build/accel_sim_release/gateware", "accel_sim_release_core.v"))
+        platform.add_source(os.path.join("build/accel_sim_release/gateware", "accel_sim_release_core.init"))
+        platform.add_source(os.path.join("build/accel_sim_release/gateware", "accel_sim_release_core_mem_1.init"))
+        platform.add_source(os.path.join("build/accel_sim_release/gateware", "accel_sim_release_core_mem_2.init"))
         platform.add_source(os.path.join("../litex/litex/soc/cores/cpu/vexriscv/verilog", "VexRiscv_Min.v"))
         platform.add_source(os.path.join("../periphs/verilog/spi", "spi_defines.v"))
         platform.add_source(os.path.join("../periphs/verilog/spi", "spi_clgen.v"))
@@ -98,19 +102,19 @@ def main():
     if args.build:
         platform = basys3.Platform()
         dut = System(platform)
-        platform.build(dut, build_dir="build/sys_accel_simulator/gateware")
+        platform.build(dut, build_dir="build/sys_accel_simulator_release/gateware")
 
     if args.load:
         from litex.build.xilinx import VivadoProgrammer
         prog = VivadoProgrammer()
-        prog.load_bitstream("build/sys_accel_simulator/gateware/top.bit")
+        prog.load_bitstream("build/sys_accel_simulator_release/gateware/top.bit")
 
     if args.flash:
         from litex.build.openocd import OpenOCD
-        prog = OpenOCD("prog/openocd_xilinx.cfg",
-            flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
+        prog = OpenOCD("../prog/openocd_xilinx.cfg",
+            flash_proxy_basename="../prog/bscan_spi_xc7a35t.bit")
         prog.set_flash_proxy_dir(".")
-        prog.flash(0, "build/sys_accel_simulator/gateware/top.bin")
+        prog.flash(0, "build/sys_accel_simulator_release/gateware/top.bin")
 
 if __name__ == "__main__":
     main()       

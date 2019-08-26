@@ -136,6 +136,30 @@ class BaseSoC(SoCCore):
         # crg
         self.submodules.crg = CRG(platform, soc_config)
 
+        if soc_config["platform_name"] in ["accel_sim_release"]:
+            # Integrate SPI master
+            self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
+            self.add_csr("spi_master", 10, allow_user_defined=True)
+            self.add_interrupt("spi_master", 6, allow_user_defined=True)
+            self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
+            spi_master.add_source(self.platform)
+
+            # Custom accel simulator IP core
+            self.submodules.accel = accel = AccelCore(freq=sys_clk_freq, baud=115200, pads=self.platform.request("spi_slave", 0))
+            self.add_csr("accel", 11, allow_user_defined=True)
+            self.add_interrupt("accel", 7, allow_user_defined=True)
+
+            if soc_config["mbx_sender"] in ["yes"]:
+                # Integrate mailbox sender
+                self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
+                self.add_csr("mbx_snd", 12, allow_user_defined=True)
+
+            if soc_config["mbx_receiver"] in ["yes"]:
+                # Integrate mailbox receiver
+                self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
+                self.add_csr("mbx_rcv", 13, allow_user_defined=True)
+                self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
+
         if soc_config["platform_name"] in ["accel_sim"]:
             # Integrate SPI master
             self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
@@ -149,14 +173,16 @@ class BaseSoC(SoCCore):
             self.add_csr("accel", 11, allow_user_defined=True)
             self.add_interrupt("accel", 7, allow_user_defined=True)
 
-            # Integrate mailbox sender
-            self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
-            self.add_csr("mbx_snd", 12, allow_user_defined=True)
+            if soc_config["mbx_sender"] in ["yes"]:
+                # Integrate mailbox sender
+                self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
+                self.add_csr("mbx_snd", 12, allow_user_defined=True)
 
-            # Integrate mailbox receiver
-            self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
-            self.add_csr("mbx_rcv", 13, allow_user_defined=True)
-            self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
+            if soc_config["mbx_receiver"] in ["yes"]:
+                # Integrate mailbox receiver
+                self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
+                self.add_csr("mbx_rcv", 13, allow_user_defined=True)
+                self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
 
         if soc_config["platform_name"] in ["accel_test"]:
             # Integrate SPI master
@@ -171,14 +197,16 @@ class BaseSoC(SoCCore):
             self.add_csr("gpio_isr", 11, allow_user_defined=True)
             self.add_interrupt("gpio_isr", 7, allow_user_defined=True)
 
-            # Integrate mailbox sender
-            self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
-            self.add_csr("mbx_snd", 12, allow_user_defined=True)
+            if soc_config["mbx_sender"] in ["yes"]:
+                # Integrate mailbox sender
+                self.submodules.mbx_snd = mbx_snd = MailBoxSenderInf(self.platform.request("mbx_snd", 0))
+                self.add_csr("mbx_snd", 12, allow_user_defined=True)
 
-            # Integrate mailbox receiver
-            self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
-            self.add_csr("mbx_rcv", 13, allow_user_defined=True)
-            self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
+            if soc_config["mbx_receiver"] in ["yes"]:
+                # Integrate mailbox receiver
+                self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
+                self.add_csr("mbx_rcv", 13, allow_user_defined=True)
+                self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
 
 def main():
     # get config

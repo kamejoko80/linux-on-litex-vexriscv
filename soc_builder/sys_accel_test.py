@@ -180,8 +180,8 @@ def main():
 
     if args.flash:
         from litex.build.openocd import OpenOCD
-        prog = OpenOCD("prog/openocd_xilinx.cfg",
-            flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
+        prog = OpenOCD("../prog/openocd_xilinx.cfg",
+            flash_proxy_basename="../prog/bscan_spi_xc7a35t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0, "build/sys_accel_test/gateware/top.bin")
 
