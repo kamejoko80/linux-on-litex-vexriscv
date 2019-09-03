@@ -90,7 +90,7 @@ class AT7CORE(Board):
 
     def flash_gw(self):
         from litex.build.openocd import OpenOCD
-        prog = OpenOCD("prog/openocd_xilinx.cfg",
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
             flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0, "build/at7core/gateware/top.bin")
