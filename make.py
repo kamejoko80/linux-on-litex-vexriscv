@@ -13,6 +13,7 @@ from soc_picorv32 import SoCPicorv32
 from soc_vexriscv import SoCVexRiscv
 from soc_ae4gx import SoCAE4GX
 from soc_basys3 import SoCBASYS3
+from soc_at7core import SoCAT7CORE
 
 # Board definition----------------------------------------------------------------------------------
 
@@ -74,6 +75,25 @@ class BASYS3(Board):
             flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0, "build/basys3/gateware/top.bin")
+
+# AT7CORE support -------------------------------------------------------------------------------------
+
+class AT7CORE(Board):
+    def __init__(self):
+        from litex.boards.targets import at7core
+        Board.__init__(self, at7core.BaseSoC, "serial")
+
+    def load(self):
+        from litex.build.xilinx import VivadoProgrammer
+        prog = VivadoProgrammer()
+        prog.load_bitstream("build/at7core/gateware/top.bit")
+
+    def flash_gw(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0, "build/at7core/gateware/top.bin")
 
 # NeTV2 support ------------------------------------------------------------------------------------
 
@@ -248,6 +268,7 @@ supported_boards = {
     # Xilinx
     "arty":         Arty,
     "basys3":       BASYS3,
+    "at7core":      AT7CORE,
     "netv2":        NeTV2,
     "genesys2":     Genesys2,
     "kcu105":       KCU105,
@@ -300,6 +321,8 @@ def main():
             soc = SoCAE4GX(board.soc_cls, **soc_kwargs)
         elif board_name in ["basys3"]:
             soc = SoCBASYS3(board.soc_cls, **soc_kwargs)
+        elif board_name in ["at7core"]:
+            soc = SoCAT7CORE(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_hx8k_b_evn"]:
             soc = SoCICE40HX(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_up5k_b_evn"]:
