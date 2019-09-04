@@ -42,7 +42,7 @@ def SoCAT7CORE(soc_cls, **kwargs):
             spi_master.add_source(self.platform)
 
             # Custom accel simulator IP core
-            self.submodules.accel = accel = AccelCore(freq=150000000, baud=115200, pads=self.platform.request("spi_slave", 0))
+            self.submodules.accel = accel = AccelCore(freq=200000000, baud=115200, pads=self.platform.request("spi_slave", 0))
             self.add_csr("accel", 11, allow_user_defined=True)
             self.add_interrupt("accel", 7, allow_user_defined=True)
 
