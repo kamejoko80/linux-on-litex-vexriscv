@@ -25,28 +25,37 @@ class System(Module):
         spi0       = platform.request("spi")
         spi_slave0 = platform.request("spi_slave")
 
-        # POR implementation
-        self.reset = Signal()
+        self.clock_domains.cd_clkout = ClockDomain()
+        self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_por = ClockDomain()
-        self.reset_delay = Signal(12, reset=4095)
+
+        # POR implementation
+        self.reset_delay = Signal(max=4095, reset=4095)
+        self.reset = Signal()
 
         self.comb += [
-            self.cd_por.clk.eq(clk100),
-        ]
-
-        self.sync.por += [
-            self.reset.eq(self.reset_delay != 0)
+            self.cd_por.clk.eq(clk100)
         ]
 
         self.sync.por += [
             If(self.reset_delay != 0,
                 self.reset_delay.eq(self.reset_delay - 1)
-            )
+            ),
+            self.reset.eq(self.reset_delay != 0)
         ]
+
+        self.submodules.pll = pll = S7PLL(speedgrade=-1)
+        pll.register_clkin(clk100, 100e6)
+        pll.create_clkout(self.cd_clkout, 250e6) # CPU clock max = 250MHz
+
+        # Important, this ensures the system works properly
+        platform.add_period_constraint(clk100, 10)
+        platform.add_period_constraint(self.cd_sys.clk, 4)
+        platform.add_period_constraint(self.cd_clkout.clk, 4)
 
         # Accel sim core
         self.specials += Instance("accel_sim_release_core",
-            i_clk                 = clk100,
+            i_clk                 = self.cd_clkout.clk,
             i_rst                 = self.reset,
             i_serial_rx           = serial.rx,
             o_serial_tx           = serial.tx,

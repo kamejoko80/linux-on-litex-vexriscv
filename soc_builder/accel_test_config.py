@@ -13,9 +13,7 @@ soc_config = {
     "mbx_receiver": "yes",         # Integrated mailbox receiver
 
     # Frequency ----------------------------------------------------------------
-    "input_clk_freq":   100e6,     # Input clock frequency
-    "sys_clk_freq":     100e6,     # System clock frequency
-    "iodelay_clk_freq": 200e6,     # IODELAYs reference clock frequency
+    "sys_clk_freq":     250e6,     # System clock frequency
 
     # Memory -------------------------------------------------------------------
     "rom_size":         64*1014,   # Integrated rom size

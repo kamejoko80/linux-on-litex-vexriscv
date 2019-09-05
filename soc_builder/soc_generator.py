@@ -106,8 +106,6 @@ class CRG(Module):
             self.cd_sys.rst.eq(rst),
         ]
 
-        platform.add_period_constraint(self.cd_sys.clk, 10)
-
 class BaseSoC(SoCCore):
     csr_map = {
         "ctrl":   0,

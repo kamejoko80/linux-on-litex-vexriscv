@@ -26,30 +26,35 @@ class System(Module):
         spi0        = platform.request("spi")
         spi_slave0  = platform.request("spi_slave")
 
+        self.clock_domains.cd_clkout = ClockDomain()
         self.clock_domains.cd_sys = ClockDomain()
-        self.cd_sys.clk.attr.add("keep")
-        self.cd_sys.rst.attr.add("keep")
+        self.clock_domains.cd_por = ClockDomain()
 
         # POR implementation
+        self.reset_delay = Signal(max=4095, reset=4095)
         self.reset = Signal()
-        self.clock_domains.cd_por = ClockDomain()
-        self.reset_delay = Signal(12, reset=4095)
 
         self.comb += [
-            self.cd_sys.clk.eq(clk100),
             self.cd_por.clk.eq(clk100),
-        ]
-
-        self.sync.por += [
-            self.cd_sys.rst.eq(self.reset_delay != 0),
-            self.reset.eq(self.reset_delay != 0)
+            self.cd_sys.clk.eq(self.cd_clkout.clk),
         ]
 
         self.sync.por += [
             If(self.reset_delay != 0,
                 self.reset_delay.eq(self.reset_delay - 1)
-            )
+            ),
+            self.reset.eq(self.reset_delay != 0),
+            self.cd_sys.rst.eq(self.reset_delay != 0),
         ]
+
+        self.submodules.pll = pll = S7PLL(speedgrade=-1)
+        pll.register_clkin(clk100, 100e6)
+        pll.create_clkout(self.cd_clkout, 250e6) # CPU clock max = 250MHz
+
+        # Important, this ensures the system works properly
+        platform.add_period_constraint(clk100, 10)
+        platform.add_period_constraint(self.cd_sys.clk, 4)
+        platform.add_period_constraint(self.cd_clkout.clk, 4)
 
         # SPI test bus internal signals
         self.spi_test_clk  = Signal()
@@ -64,7 +69,7 @@ class System(Module):
 
         # Accel simulator core
         self.specials += Instance("accel_sim_core",
-            i_clk                 = clk100,
+            i_clk                 = self.cd_clkout.clk,
             i_rst                 = self.reset,
             i_serial_rx           = serial.rx,
             o_serial_tx           = serial.tx,
@@ -113,7 +118,7 @@ class System(Module):
 
         # Accel test core
         self.specials += Instance("accel_test_core",
-            i_clk                 = clk100,
+            i_clk                 = self.cd_clkout.clk,
             i_rst                 = self.reset,
             i_serial_rx           = serial_test.rx,
             o_serial_tx           = serial_test.tx,
