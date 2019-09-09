@@ -10,6 +10,12 @@ from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 
 # GPIO interrupt
+class GpioLED(Module, AutoCSR):
+    def __init__(self, pad):
+        self.led = CSRStorage(8)
+        self.comb += pad.eq(self.led.storage)
+
+# GPIO interrupt
 class GpioISR(Module, AutoCSR):
     def __init__(self, pad, rissing_edge_detect = False):
         # Add int to module

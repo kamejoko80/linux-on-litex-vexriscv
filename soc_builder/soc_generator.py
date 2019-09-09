@@ -35,6 +35,7 @@ def get_common_ios():
         ),
 
         ("gpio_irq", 0, Pins("1")),
+        ("user_led", 15, Pins("1")),
 
         # SPI master
         ("spi", 0,
@@ -48,23 +49,24 @@ def get_common_ios():
         # SPI slave, accel simulator
         ("spi_slave", 0,
             # SPI slave part
-            Subsignal("sck",  Pins(1)),
-            Subsignal("miso", Pins(1)),
-            Subsignal("mosi", Pins(1)),
-            Subsignal("csn",  Pins(1)),
-            Subsignal("int1", Pins(1)),
-            Subsignal("int2", Pins(1)),
-            #Subsignal("irq", Pins(1)),
-            Subsignal("led0", Pins(1)),
-            Subsignal("led1", Pins(1)),
-            Subsignal("led2", Pins(1)),
-            Subsignal("led3", Pins(1)),
-            Subsignal("led4", Pins(1)),
-            Subsignal("led5", Pins(1)),
-            Subsignal("led6", Pins(1)),
+            Subsignal("sck",   Pins(1)),
+            Subsignal("miso",  Pins(1)),
+            Subsignal("mosi",  Pins(1)),
+            Subsignal("csn",   Pins(1)),
+            Subsignal("int1",  Pins(1)),
+            Subsignal("int2",  Pins(1)),
+            #Subsignal("irq",  Pins(1)),
+            Subsignal("led0",  Pins(1)),
+            Subsignal("led1",  Pins(1)),
+            Subsignal("led2",  Pins(1)),
+            Subsignal("led3",  Pins(1)),
+            Subsignal("led4",  Pins(1)),
+            Subsignal("led5",  Pins(1)),
+            Subsignal("led6",  Pins(1)),
+            Subsignal("led15", Pins(1)),
             # UART part
-            Subsignal("tx",   Pins(1)),
-            Subsignal("rx",   Pins(1)),
+            Subsignal("tx",    Pins(1)),
+            Subsignal("rx",    Pins(1)),
         ),
 
         # MailBox sender interface
@@ -157,6 +159,10 @@ class BaseSoC(SoCCore):
                 self.submodules.mbx_rcv = mbx_rcv = MailBoxReceiverInf(self.platform.request("mbx_rcv", 0))
                 self.add_csr("mbx_rcv", 13, allow_user_defined=True)
                 self.add_interrupt("mbx_rcv", 8, allow_user_defined=True)
+
+            # Integrate GPIO LED
+            self.submodules.gpio_led = gpio_led = GpioLED(self.platform.request("user_led", 15))
+            self.add_csr("gpio_led", 14, allow_user_defined=True)
 
         if soc_config["platform_name"] in ["accel_sim"]:
             # Integrate SPI master

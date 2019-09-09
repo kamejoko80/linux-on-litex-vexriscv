@@ -24,6 +24,7 @@ class System(Module):
         clk100     = platform.request("clk")
         spi0       = platform.request("spi")
         spi_slave0 = platform.request("spi_slave")
+        user_led   = platform.request("user_led", 15)
 
         self.clock_domains.cd_clkout = ClockDomain()
         self.clock_domains.cd_sys = ClockDomain()
@@ -87,6 +88,8 @@ class System(Module):
             # Accel uart
             #i_spi_slave0_tx      = spi_slave0.tx,
             #i_spi_slave0_rx      = spi_slave0.rx,
+
+            o_user_led15          = user_led
         )
 
         platform.add_source(os.path.join("build/accel_sim_release/gateware", "accel_sim_release_core.v"))
