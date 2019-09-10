@@ -35,15 +35,8 @@ def SoCAT7CORE(soc_cls, **kwargs):
             soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="lite", **kwargs)
 
             # Integrate SPI master
-            self.submodules.spi_master = spi_master = SpiMaster(self.platform.request("spi", 0))
-            self.add_csr("spi_master", 10, allow_user_defined=True)
-            self.add_interrupt("spi_master", 6, allow_user_defined=True)
-            self.register_mem("spi_master", 0x30000000, spi_master.bus, 32)
-            spi_master.add_source(self.platform)
-
-            # Custom accel simulator IP core
-            self.submodules.accel = accel = AccelCore(freq=200000000, baud=115200, pads=self.platform.request("spi_slave", 0))
-            self.add_csr("accel", 11, allow_user_defined=True)
-            self.add_interrupt("accel", 7, allow_user_defined=True)
+            self.submodules.spi_master_01 = spi_master_01 = SPIMasterController(freq=200e6, baudrate=2e6, pads=self.platform.request("spi", 0))
+            self.add_csr("spi_master_01", 10, allow_user_defined=True)
+            #self.add_interrupt("spi_master_01", 6, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
