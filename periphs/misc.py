@@ -1,13 +1,62 @@
 import os
+import sys
 
 from migen import *
 from migen.genlib.fifo import SyncFIFOBuffered
+from migen.genlib.misc import WaitTimer
+from migen.fhdl.specials import Tristate
 
 from litex.soc.interconnect import wishbone
 from litex.soc.integration.soc_core import mem_decoder
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
+
+class Debouncer(Module):
+    def __init__(self, cycles=1):
+        self.i = Signal()
+        self.o = Signal()
+
+        timer = WaitTimer(cycles - 1)
+        self.submodules += timer
+        new = Signal()
+        rst = Signal(reset=1)
+        self.sync += [
+            If(timer.wait,
+                If(timer.done,
+                    timer.wait.eq(0),
+                    new.eq(~new),
+                ),
+            ).Elif(self.i == new,
+                timer.wait.eq(1),
+            ),
+            If(rst,
+                rst.eq(0),
+                timer.wait.eq(0),
+                new.eq(~self.i),
+            ),
+        ]
+        self.comb += [
+            self.o.eq(Mux(timer.wait, new, self.i)),
+        ]
+
+class EdgeDetector(Module):
+    def __init__(self):
+        self.i   = Signal() # Signal input
+        self.r   = Signal() # Rising edge detect
+        self.f   = Signal() # Falling edge detect
+        self.cnt = Signal(2)
+
+        self.comb += [
+            self.r.eq(self.cnt == 1),
+            self.f.eq(self.cnt == 2),
+        ]
+
+        self.sync += [
+            self.cnt[1].eq(self.cnt[0]),
+            self.cnt[0].eq(self.i),
+        ]
+
 
 # GPIO interrupt
 class GpioLED(Module, AutoCSR):
@@ -67,6 +116,159 @@ class MyUart(Module, AutoCSR):
 
     def add_source(self, platform):
             platform.add_source(os.path.join("periphs/verilog/uart", "my_uart.v"))
+
+# Custom UART module
+class UART(Module):
+    # freg  : sys_clk frequency
+    # baud  : Uart baud rate
+    # ratio : Over sampling ratio (choose 100)
+    def __init__(self, freq, baud=115200, ratio=100):
+        # Exteral interface signals
+        self.tx = Signal(1, reset=1)
+        self.rx = Signal()
+        # Internal interface signals
+        self.din = Signal(8)
+        self.dout = Signal(8)
+        self.writable = Signal() # Assert indicates din can be written
+        self.readable = Signal()  # Assert inditates dout can be read
+        self.tx_start = Signal()
+        # Module local signals
+        self.prescaler = Signal(max=int(freq/(baud*ratio))-1)
+        self.rxcount = Signal(max=ratio-1)
+        self.txcount = Signal(max=ratio-1)
+        self.rxsampling = Signal()
+        self.txshifting = Signal()
+        self.rx_ena = Signal()
+        self.tx_ena = Signal()
+        self.rxbitcnt = Signal(max=9)
+        self.txbitcnt = Signal(max=10)
+
+        # To detect rising/falling edge of rx pin
+        edt = EdgeDetector()
+        self.submodules += edt
+
+        # RX edge detecting
+        self.comb += [
+            edt.i.eq(self.rx)
+        ]
+
+        # Sampling behavior
+        self.sync += [
+            If(self.prescaler == int(freq/(baud*ratio))-1,
+                self.prescaler.eq(0),
+                # TX sampling strobe generation
+                If(self.tx_ena,
+                    If(self.txcount == ratio-1,
+                        self.txcount.eq(0),
+                        self.txshifting.eq(1),
+                    ).Else(
+                        self.txshifting.eq(0),
+                        self.txcount.eq(self.txcount + 1),
+                    ),
+                ),
+                # RX sampling strobe generation
+                If(self.rx_ena,
+                    If(self.rxcount == ratio-1,
+                        self.rxcount.eq(0),
+                        self.rxsampling.eq(1),
+                    ).Else(
+                        self.rxsampling.eq(0),
+                        self.rxcount.eq(self.rxcount + 1),
+                    ),
+                ),
+            ).Else(
+                self.prescaler.eq(self.prescaler + 1),
+                self.txshifting.eq(0),
+                self.rxsampling.eq(0),
+            )
+        ]
+
+        # RX submodule FSM handles data in/out activities
+        rxfsm = FSM(reset_state = "IDLE")
+        self.submodules += rxfsm
+
+        # RX FSM behavior description
+        rxfsm.act("IDLE",
+            If(edt.f, # START condition
+                NextValue(self.dout, 0),
+                NextValue(self.rx_ena, 1),
+                NextValue(self.rxcount, int(ratio/2)-1),
+                NextValue(self.rxbitcnt, 0),
+                NextState("START"),
+            )
+        )
+        rxfsm.act("START",
+            If(self.rxsampling,
+                If(~self.rx,
+                    NextState("GET_BITS"),
+                ).Else(
+                    NextValue(self.rx_ena, 0),
+                    NextState("IDLE"),
+                )
+            )
+        )
+        rxfsm.act("GET_BITS",
+            If(self.rxsampling,
+                If(self.rxbitcnt < 8,
+                    NextValue(self.dout[7], self.rx),
+                    NextValue(self.dout, self.dout >> 1),
+                ),
+                If(self.rxbitcnt == 8,
+                    # Shift bit
+                    NextValue(self.rxbitcnt, self.rxbitcnt + 1),
+                ).Elif(self.rxbitcnt == 9, # STOP bit condition
+                    NextValue(self.rx_ena, 0),
+                    NextState("IDLE"),
+                ).Else(
+                   NextValue(self.rxbitcnt, self.rxbitcnt + 1),
+                )
+            )
+        )
+
+        # TX submodule FSM handles data in/out activities
+        txfsm = FSM(reset_state = "IDLE")
+        self.submodules += txfsm
+
+        # TX FSM behavior description
+        txfsm.act("IDLE",
+            If(self.tx_start, # START condition
+                NextValue(self.tx_start, 0),
+                NextValue(self.tx_ena, 1),
+                NextValue(self.tx, 0),
+                NextValue(self.txcount, int(ratio)-1),
+                NextValue(self.txbitcnt, 0),
+                NextState("START"),
+            )
+        )
+        txfsm.act("START",
+            If(self.txshifting,
+                NextState("SHIFT_OUT"),
+            )
+        )
+        txfsm.act("SHIFT_OUT",
+            If(self.txshifting,
+                If(self.txbitcnt < 8,
+                    NextValue(self.tx, self.din[0]),
+                    NextValue(self.din, self.din >> 1),
+                ),
+                If(self.txbitcnt == 8,
+                    # Shift bit
+                    NextValue(self.txbitcnt, self.txbitcnt + 1),
+                    NextValue(self.tx, 1),
+                ).Elif(self.txbitcnt == 10, # STOP bit + IDLE
+                    NextValue(self.tx_ena, 0),
+                    NextState("IDLE"),
+                ).Else(
+                   NextValue(self.txbitcnt, self.txbitcnt + 1),
+                )
+            )
+        )
+
+        # Status signal notification
+        self.comb += [
+            self.readable.eq(self.rxsampling & (self.rxbitcnt == 8)),
+            self.writable.eq(~self.tx_ena),
+        ]
 
 # Simple wishbone gpio module
 class WbGpio(Module):
@@ -276,4 +478,182 @@ class MailBoxReceiverInf(Module, AutoCSR):
             self.len.status.eq(pads.len_status),
             self.ev.mbx_int.trigger.eq(pads.int),
         ]
-        
+
+class SyncFIFOTest(Module):
+    def __init__(self, width, depth):
+        self.din = Signal(width)
+        self.dout = Signal(width)
+        self.level = Signal(max=depth+2)
+        self.writable = Signal()
+        self.readable = Signal()
+        self.we = Signal()
+        self.re = Signal()
+
+        fifo = SyncFIFOBuffered(width, depth)
+        self.submodules += fifo
+
+        self.comb += [
+            fifo.din.eq(self.din),
+            self.dout.eq(fifo.dout),
+            self.level.eq(fifo.level),
+            self.writable.eq(fifo.writable),
+            self.readable.eq(fifo.readable),
+            fifo.we.eq(self.we),
+            fifo.re.eq(self.re),
+        ]
+
+def SyncFIFOTestTestBench(dut):
+
+    for cycle in range(1000):
+
+        if cycle == 3:
+            yield dut.din.eq(0xA3)
+
+        if cycle == 4:
+            yield dut.din.eq(0xA4)
+
+        if cycle == 5:
+            yield dut.din.eq(0xA5)
+
+        if cycle == 6:
+            yield dut.din.eq(0x00)
+
+        if cycle == 3:
+            yield dut.we.eq(1)
+
+        if cycle == 5:
+            yield dut.we.eq(1)
+
+        if cycle == 6:
+            yield dut.we.eq(0)
+
+        if cycle > 7:
+            yield dut.re.eq(1)
+        else:
+            yield dut.re.eq(0)
+
+        yield
+
+def UARTTestBench(dut):
+
+    r = 100  # Over sampling ratio
+    m = 4    # Prescaler ratio
+    s = 12   # RXD goes low at cycle 12th
+    data = 0 # Received data
+    i = 0
+    setup_pos = 0
+
+    for cycle in range(10000):
+
+        ###### Receive byte 1 #########
+        if cycle == 0:
+            yield dut.rx.eq(1)
+
+        if cycle == 12:
+            yield dut.rx.eq(0)
+            s = 12
+            data = 0x12A # Data received 0x2A
+            i = 0
+            setup_pos = 0
+
+        ###### Receive byte 2 #########
+        if cycle == 4200:
+            yield dut.rx.eq(1)
+
+        if cycle == 4500:
+            yield dut.rx.eq(0)
+            s = 4500
+            data = 0x117 # Data received 0x17
+            i = 0
+            setup_pos = 0
+
+        ###### generate rx waveform #########
+        if cycle == s + m*(r/2+1) + m*(r+1)*i:
+            sampling = cycle
+            setup_pos = sampling + m*(r/2+1)
+            i = i + 1
+
+        if cycle == setup_pos and i > 0:
+            if i < 9:
+                if data & 0x01:
+                    yield dut.rx.eq(1)
+                else:
+                    yield dut.rx.eq(0)
+                data = data >> 1
+            else:
+                yield dut.rx.eq(1)
+
+        yield
+
+def UARTWriteFIFOTestBench(dut):
+
+    r = 100  # Over sampling ratio
+    m = 4    # Prescaler ratio
+    s = 12   # RXD goes low at cycle 12th
+    data = 0 # Received data
+    i = 0
+    setup_pos = 0
+
+    for cycle in range(14000):
+
+        ###### Receive byte 1 #########
+        if cycle == 0:
+            yield dut.rx.eq(1)
+
+        if cycle == 12:
+            yield dut.rx.eq(0)
+            s = 12
+            data = 0x12A # Data received 0x2A
+            i = 0
+            setup_pos = 0
+
+        ###### Receive byte 2 #########
+        if cycle == 4200:
+            yield dut.rx.eq(1)
+
+        if cycle == 4500:
+            yield dut.rx.eq(0)
+            s = 4500
+            data = 0x117 # Data received 0x17
+            i = 0
+            setup_pos = 0
+
+        ###### Receive byte 3 #########
+        if cycle == 8000:
+            yield dut.rx.eq(1)
+
+        if cycle == 8500:
+            yield dut.rx.eq(0)
+            s = 8500
+            data = 0x1A5 # Data received 0xA5
+            i = 0
+            setup_pos = 0
+
+        ###### generate rx waveform #########
+        if cycle == s + m*(r/2+1) + m*(r+1)*i:
+            sampling = cycle
+            setup_pos = sampling + m*(r/2+1)
+            i = i + 1
+
+        if cycle == setup_pos and i > 0:
+            if i < 9:
+                if data & 0x01:
+                    yield dut.rx.eq(1)
+                else:
+                    yield dut.rx.eq(0)
+                data = data >> 1
+            else:
+                yield dut.rx.eq(1)
+
+        yield
+
+#if __name__ == "__main__":
+
+    #dut = SyncFIFOTest(width=8, depth=2)
+    #print(verilog.convert(SyncFIFOTest(width=8, depth=32)))
+    #run_simulation(dut, SyncFIFOTestTestBench(dut), clocks={"sys": 10}, vcd_name="SyncFIFOTest.vcd")
+    #os.system("gtkwave SyncFIFOTest.vcd")
+
+    #dut = UART(freq=50000000, baud=115200)
+    #print(verilog.convert(UART(freq=50000000, baud=115200)))
+    #run_simulation(dut, UARTTestBench(dut), clocks={"sys": 10}, vcd_name="UART.vcd")        
