@@ -504,27 +504,33 @@ class SyncFIFOTest(Module):
 
 class SPIMasterController(Module, AutoCSR):
     def __init__(self, freq, baudrate, pads):
-        # Physical pins interface
-        # pads.sclk  = Signal()        # SCK pin output
-        # pads.mosi = Signal()         # MOSI pin output
-        # pads.miso = Signal()         # MISO pin input
-        # pads.csn  = Signal(reset=1)  # Slave select pin output
-        # pads.irq  = Signal()         # Interrupt pin output
-
         # CSR interface
-        self.config  = CSRStorage(4, reset=0x0C) # [CPOL, CPHA, IPOL, IE]
-        self.tx_data = CSRStorage(8)
-        self.rx_data = CSRStatus(8)
-        self.done    = CSRStatus(reset=1)
-        self.start   = CSR()
-        self.csn     = CSRStorage()
+        self.config    = CSRStorage(4, reset=0x00) # [IE, IPOL, CPHA, CPOL]
+        self.tx_data   = CSRStorage(8)
+        self.done      = CSRStatus(reset=1)
+        self.start     = CSR()
+
+        # SPI internal signals
+        self.csn       = CSRStorage(reset=1)
+        self.sck       = Signal()
+        self.mosi      = Signal()
+        self.miso_0    = Signal()     # miso line 0
+        self.miso_1    = Signal()     # miso line 1
+        self.miso_2    = Signal()     # miso line 2
+        self.miso_3    = Signal()     # miso line 3
+
+        # Check if we need more miso line
+        self.rx_data_0 = CSRStatus(8) # miso line 0
+        self.rx_data_1 = CSRStatus(8) # miso line 1
+        self.rx_data_2 = CSRStatus(8) # miso line 2
+        self.rx_data_3 = CSRStatus(8) # miso line 3
 
         # Internal signals
         self.prescaler = Signal(max=int(freq/baudrate))
         self.frame     = Signal(reset=1)
         self.spi_clk   = Signal()
         self.tx_buf    = Signal(8)
-        self.rx_buf    = Signal(8)
+        self.rx_buf    = Array(Signal(8) for a in range(4))
         self.edge_cnt  = Signal(5)
         self.irq       = Signal()
 
@@ -538,7 +544,10 @@ class SPIMasterController(Module, AutoCSR):
                         self.spi_clk.eq(~self.spi_clk)
                     ).Else(
                         self.frame.eq(1),
-                        self.rx_data.status.eq(self.rx_buf),
+                        self.rx_data_0.status.eq(self.rx_buf[0]), # miso line 0
+                        self.rx_data_1.status.eq(self.rx_buf[1]), # miso line 1
+                        self.rx_data_2.status.eq(self.rx_buf[2]), # miso line 2
+                        self.rx_data_3.status.eq(self.rx_buf[3]), # miso line 3
                         self.done.status.eq(1),
                         self.irq.eq(1)
                     )
@@ -551,16 +560,14 @@ class SPIMasterController(Module, AutoCSR):
         ####### pin signal assignment #######
 
         self.comb += [
-            # pin sck
+            # signal sck
             If(self.config.storage[0] == 0, # CPOL = 0
-                pads.sclk.eq(self.spi_clk)
+                self.sck.eq(self.spi_clk)
             ).Else(
-                pads.sclk.eq(~self.spi_clk)
+                self.sck.eq(~self.spi_clk)
             ),
-            # pin mosi
-            pads.mosi.eq(self.tx_buf[7]),
-            # pin csn
-            pads.csn.eq(self.csn.storage),
+            # signal mosi
+            self.mosi.eq(self.tx_buf[7]),
             # pin irq
             If(self.config.storage[3],     # IE   = 1 (Interrupt enable)
                 If(self.config.storage[2], # IPOL = 1 (Active high)
@@ -573,11 +580,54 @@ class SPIMasterController(Module, AutoCSR):
             )
         ]
 
+        # pin sck_x
+        if hasattr(pads, "sck_0"):
+            self.comb += pads.sck_0.eq(self.sck)     # sck line 0
+        if hasattr(pads, "sck_1"):
+            self.comb += pads.sck_1.eq(self.sck)     # sck line 1
+        if hasattr(pads, "sck_2"):
+            self.comb += pads.sck_2.eq(self.sck)     # sck line 2
+        if hasattr(pads, "sck_3"):
+            self.comb += pads.sck_3.eq(self.sck)     # sck line 3
+
+        # pin miso_x
+        if hasattr(pads, "miso_0"):
+            self.comb += self.miso_0.eq(pads.miso_0) # miso line 0
+        if hasattr(pads, "miso_1"):
+            self.comb += self.miso_1.eq(pads.miso_1) # miso line 1
+        if hasattr(pads, "miso_2"):
+            self.comb += self.miso_2.eq(pads.miso_2) # miso line 2
+        if hasattr(pads, "miso_3"):
+            self.comb += self.miso_3.eq(pads.miso_3) # miso line 3
+
+        # pin mosi_x
+        if hasattr(pads, "mosi_0"):
+            self.comb += pads.mosi_0.eq(self.mosi)   # miso line 0
+        if hasattr(pads, "mosi_1"):
+            self.comb += pads.mosi_1.eq(self.mosi)   # miso line 1
+        if hasattr(pads, "mosi_2"):
+            self.comb += pads.mosi_2.eq(self.mosi)   # miso line 2
+        if hasattr(pads, "mosi_3"):
+            self.comb += pads.mosi_3.eq(self.mosi)   # miso line 3
+
+        # pin csn_x
+        if hasattr(pads, "csn_0"):
+            self.comb += pads.csn_0.eq(self.csn.storage) # csn line 0
+        if hasattr(pads, "csn_1"):
+            self.comb += pads.csn_1.eq(self.csn.storage) # csn line 1
+        if hasattr(pads, "csn_2"):
+            self.comb += pads.csn_2.eq(self.csn.storage) # csn line 2
+        if hasattr(pads, "csn_3"):
+            self.comb += pads.csn_3.eq(self.csn.storage) # csn line 3
+
         # SPI start condition
         self.sync += [
             If(self.start.re & self.start.r & self.done.status,
                 self.tx_buf.eq(self.tx_data.storage),
-                self.rx_buf.eq(0),
+                self.rx_buf[0].eq(0), # miso line 0
+                self.rx_buf[1].eq(0), # miso line 1
+                self.rx_buf[2].eq(0), # miso line 2
+                self.rx_buf[3].eq(0), # miso line 3
                 self.prescaler.eq(0),
                 self.frame.eq(0),
                 self.done.status.eq(0),
@@ -620,20 +670,32 @@ class SPIMasterController(Module, AutoCSR):
                 If(self.config.storage[1], # CPHA = 1
                     If(edt.r,
                         NextValue(self.tx_buf, self.tx_buf << 1),
-                        NextValue(self.rx_buf[0], pads.miso),
+                        NextValue(self.rx_buf[0][0], self.miso_0),      # miso line 0
+                        NextValue(self.rx_buf[1][0], self.miso_1),      # miso line 1
+                        NextValue(self.rx_buf[2][0], self.miso_2),      # miso line 2
+                        NextValue(self.rx_buf[3][0], self.miso_3),      # miso line 3
                         NextState("SHIFT")
                     ),
                     If(edt.f,
-                        NextValue(self.rx_buf, self.rx_buf << 1)
+                        NextValue(self.rx_buf[0], self.rx_buf[0] << 1), # miso line 0
+                        NextValue(self.rx_buf[1], self.rx_buf[1] << 1), # miso line 1
+                        NextValue(self.rx_buf[2], self.rx_buf[2] << 1), # miso line 2
+                        NextValue(self.rx_buf[3], self.rx_buf[3] << 1), # miso line 3
                     )
                 ).Else( # CPHA = 0
                     If(edt.f,
                         NextValue(self.tx_buf, self.tx_buf << 1),
-                        NextValue(self.rx_buf[0], pads.miso),
+                        NextValue(self.rx_buf[0][0], self.miso_0),      # miso line 0
+                        NextValue(self.rx_buf[1][0], self.miso_1),      # miso line 1
+                        NextValue(self.rx_buf[2][0], self.miso_2),      # miso line 2
+                        NextValue(self.rx_buf[3][0], self.miso_3),      # miso line 3
                         NextState("SHIFT")
                     ),
                     If(edt.r,
-                        NextValue(self.rx_buf, self.rx_buf << 1)
+                        NextValue(self.rx_buf[0], self.rx_buf[0] << 1), # miso line 0
+                        NextValue(self.rx_buf[1], self.rx_buf[1] << 1), # miso line 1
+                        NextValue(self.rx_buf[2], self.rx_buf[2] << 1), # miso line 2
+                        NextValue(self.rx_buf[3], self.rx_buf[3] << 1), # miso line 3
                     )
                 )
             )

@@ -34,9 +34,14 @@ def SoCAT7CORE(soc_cls, **kwargs):
         def __init__(self, **kwargs):
             soc_cls.__init__(self, cpu_type="vexriscv", cpu_variant="lite", **kwargs)
 
-            # Integrate SPI master
-            self.submodules.spi_master_01 = spi_master_01 = SPIMasterController(freq=200e6, baudrate=2e6, pads=self.platform.request("spi", 0))
-            self.add_csr("spi_master_01", 10, allow_user_defined=True)
-            #self.add_interrupt("spi_master_01", 6, allow_user_defined=True)
+            # Integrate SPI master 0
+            self.submodules.spi_master_0 = spi_master_0 = SPIMasterController(freq=200e6, baudrate=20e6, pads=self.platform.request("spi", 0))
+            self.add_csr("spi_master_0", 5, allow_user_defined=True)
+            #self.add_interrupt("spi_master_0", 5, allow_user_defined=True)
+
+            # Integrate SPI master 1
+            self.submodules.spi_master_1 = spi_master_1 = SPIMasterController(freq=200e6, baudrate=20e6, pads=self.platform.request("spi", 1))
+            self.add_csr("spi_master_1", 6, allow_user_defined=True)
+            #self.add_interrupt("spi_master_1", 6, allow_user_defined=True)
 
     return _SoCLinux(**kwargs)
