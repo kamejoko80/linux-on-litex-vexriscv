@@ -88,7 +88,7 @@ def SoCLinux(soc_cls, **kwargs):
             "csr":          0xf0000000,
         }}
 
-        def __init__(self, cpu_variant="linux", uart_baudrate=1e6, **kwargs):
+        def __init__(self, cpu_variant="linux", uart_baudrate=115200, **kwargs):
 
             # SoC ----------------------------------------------------------------------------------
             soc_cls.__init__(self,

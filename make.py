@@ -25,6 +25,26 @@ class Board:
 
 # Arty support -------------------------------------------------------------------------------------
 
+class Wukong(Board):
+    SPIFLASH_PAGE_SIZE    = 256
+    SPIFLASH_SECTOR_SIZE  = 64*kB
+    SPIFLASH_DUMMY_CYCLES = 11
+    def __init__(self):
+        from custom_boards.targets import wukong
+        Board.__init__(self, wukong.BaseSoC, {"serial"})
+
+    def load(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg")
+        prog.load_bitstream("build/wukong/gateware/top.bit")
+
+    def flash(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0, "build/wukong/gateware/top.bin")    
+
 class Arty(Board):
     SPIFLASH_PAGE_SIZE    = 256
     SPIFLASH_SECTOR_SIZE  = 64*kB
@@ -299,6 +319,7 @@ class De0Nano(Board):
 
 supported_boards = {
     # Xilinx
+    "wukong":       Wukong,
     "arty":         Arty,
     "arty_a7":      ArtyA7,
     "arty_s7":      ArtyS7,
