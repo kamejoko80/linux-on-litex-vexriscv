@@ -23,6 +23,14 @@ _io = [
         IOStandard("LVCMOS33")
     ),
 
+    ("spi", 0,
+        Subsignal("clk",  Pins("G8")),
+        Subsignal("cs_n", Pins("D5")),
+        Subsignal("mosi", Pins("G5")),
+        Subsignal("miso", Pins("G7")),
+        IOStandard("LVCMOS33"),
+    ),
+
     ("spiflash4x", 0,
         Subsignal("cs_n", Pins("P18")),
         Subsignal("clk",  Pins("H13")),

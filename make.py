@@ -31,7 +31,7 @@ class Wukong(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import wukong
-        Board.__init__(self, wukong.BaseSoC, {"serial"})
+        Board.__init__(self, wukong.BaseSoC, {"serial", "spi"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -43,7 +43,7 @@ class Wukong(Board):
         prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
             flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
         prog.set_flash_proxy_dir(".")
-        prog.flash(0, "build/wukong/gateware/top.bin")    
+        prog.flash(0, "build/wukong/gateware/top.bin")
 
 class Arty(Board):
     SPIFLASH_PAGE_SIZE    = 256
