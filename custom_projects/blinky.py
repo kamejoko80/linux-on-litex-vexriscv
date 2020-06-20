@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 
@@ -22,9 +24,18 @@ class MyLedBlink(Module):
     def __init__(self, platform):
         self.submodules.crg = CRG(platform, 100e6)
         self.led = led = platform.request("user_led")
+        self.rst = rst = platform.request("sw2")
+
         counter = Signal(25)
 
-        self.sync += counter.eq(counter + 1)
+        self.sync += [
+            If(rst,
+                counter.eq(counter + 1)
+            ).Else(
+                counter.eq(0)
+            )
+        ]
+
         self.comb += led.eq(counter[24])
 
 platform = wukong.Platform()
