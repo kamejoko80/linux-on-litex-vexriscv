@@ -31,7 +31,7 @@ class Wukong(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import wukong
-        Board.__init__(self, wukong.BaseSoC, {"serial", "spi"})
+        Board.__init__(self, wukong.BaseSoC, {"serial", "spi", "spidma"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -412,6 +412,8 @@ def main():
             soc.add_switches()
         if "spi" in board.soc_capabilities:
             soc.add_spi(args.spi_data_width, args.spi_clk_freq)
+        if "spidma" in board.soc_capabilities:
+            soc.add_spidma()
         if "i2c" in board.soc_capabilities:
             soc.add_i2c()
         if "xadc" in board.soc_capabilities:

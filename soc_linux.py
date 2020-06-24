@@ -9,6 +9,7 @@ from litex.soc.interconnect import wishbone
 
 from litex.soc.cores.gpio import GPIOOut, GPIOIn
 from litex.soc.cores.spi import SPIMaster
+from litex.soc.cores.dma import Wishbone2SPIDMA
 from litex.soc.cores.bitbang import I2CMaster
 from litex.soc.cores.xadc import XADC
 from litex.soc.cores.pwm import PWM
@@ -124,6 +125,12 @@ def SoCLinux(soc_cls, **kwargs):
             spi_pads = self.platform.request("spi")
             self.submodules.spi = SPIMaster(spi_pads, data_width, self.clk_freq, clk_freq)
             self.add_csr("spi")
+
+        # SPI DMA ----------------------------------------------------------------------------------
+        def add_spidma(self):
+            self.submodules.spi_dma = Wishbone2SPIDMA()
+            self.add_csr("spi_dma")
+            self.bus.add_master(master = self.spi_dma.bus)
 
         # I2C --------------------------------------------------------------------------------------
         def add_i2c(self):
