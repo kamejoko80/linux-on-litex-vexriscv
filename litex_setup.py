@@ -91,12 +91,18 @@ if "init" in sys.argv[1:]:
             print("[cloning " + name + "]...")
             full_url = url + name
             opts = "--recursive" if need_recursive else ""
-            subprocess.check_call(
-                "git clone " + full_url + " " + opts,
-                shell=True)
-            subprocess.check_call(
-                "git --git-dir=" + name + "/.git checkout " + revision,
-                shell=True)
+            if name in ["litex"]:
+                subprocess.check_call(
+                    "git clone " + full_url + " " + opts + " -b " + revision,
+                    shell=True)
+            else:
+                subprocess.check_call(
+                    "git clone " + full_url + " " + opts,
+                    shell=True)
+            if name not in ["litex"]:
+                subprocess.check_call("cd " + name + ";" +
+                    "git checkout " + revision + ";" +
+                    "cd ..", shell=True)
 
 # Repositories installation
 if "install" in sys.argv[1:]:
