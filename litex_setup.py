@@ -18,7 +18,7 @@ repos = [
     ("migen",        ("https://github.com/m-labs/",        True,  True, "19d5eae")),
 
     # LiteX SoC builder
-    ("litex",        ("https://github.com/enjoy-digital/", True,  True, "56e1528")),
+    ("litex",        ("https://github.com/kamejoko80/",    True,  True, "fpga_lab")),
 
     # LiteX cores ecosystem
     ("liteeth",      ("https://github.com/enjoy-digital/", False, True, "705003e")),
