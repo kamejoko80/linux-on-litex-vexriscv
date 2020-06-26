@@ -100,7 +100,7 @@ _connectors = [
 
 class Platform(XilinxPlatform):
     default_clk_name   = "sys_clk"
-    default_clk_period = 1e9/100e6
+    default_clk_period = 1e9/50e6
 
     def __init__(self):
         XilinxPlatform.__init__(self, "xc7a100tfgg676-2", _io, _connectors, toolchain="vivado")
