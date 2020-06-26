@@ -65,11 +65,11 @@ class _CRG(Module):
         # Important, this ensures the system works properly
         platform.add_period_constraint(clk50, 20)
         platform.add_period_constraint(self.cd_sys.clk, float(1e9/sys_clk_freq))
-        platform.add_period_constraint(self.cd_sys2x.clk, 5)
-        platform.add_period_constraint(self.cd_sys4x.clk, 2.5)
-        platform.add_period_constraint(self.cd_sys4x_dqs.clk, 2.5)
-        platform.add_period_constraint(self.cd_clk200.clk, 5)
-        platform.add_period_constraint(self.cd_eth.clk, 40)
+        platform.add_period_constraint(self.cd_sys2x.clk, float(1e9/(2*sys_clk_freq)))
+        platform.add_period_constraint(self.cd_sys4x.clk, float(1e9/(4*sys_clk_freq)))
+        platform.add_period_constraint(self.cd_sys4x_dqs.clk, float(1e9/(4*sys_clk_freq)))
+        platform.add_period_constraint(self.cd_clk200.clk, float(1e9/200e6))
+        platform.add_period_constraint(self.cd_eth.clk, float(1e9/25e6))
         platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk50_IBUF]")
 
 # BaseSoC ------------------------------------------------------------------------------------------
