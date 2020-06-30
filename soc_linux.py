@@ -130,6 +130,7 @@ def SoCLinux(soc_cls, **kwargs):
         def add_spidma(self):
             self.submodules.spi_dma = Wishbone2SPIDMA()
             self.add_csr("spi_dma")
+            self.add_interrupt("spi_dma")
             self.bus.add_master(master = self.spi_dma.bus)
 
         # I2C --------------------------------------------------------------------------------------
