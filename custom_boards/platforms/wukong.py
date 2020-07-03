@@ -24,10 +24,10 @@ _io = [
     ),
 
     ("spi", 0,
-        Subsignal("clk",  Pins("G8")),
-        Subsignal("cs_n", Pins("D5")),
-        Subsignal("mosi", Pins("G5")),
-        Subsignal("miso", Pins("G7")),
+        Subsignal("clk",  Pins("AB26")), # G8
+        Subsignal("cs_n", Pins("AC26")), # D5
+        Subsignal("mosi", Pins("AB24")), # G5
+        Subsignal("miso", Pins("AC24")), # G7
         IOStandard("LVCMOS33"),
     ),
 
