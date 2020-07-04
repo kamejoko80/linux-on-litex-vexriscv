@@ -7,6 +7,7 @@ import os
 from litex.soc.integration.builder import Builder
 
 from soc_linux import SoCLinux, video_resolutions
+from soc_standalone import SoCStandAlone, video_resolutions
 
 kB = 1024
 
@@ -44,6 +45,13 @@ class Wukong(Board):
             flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0, "build/wukong/gateware/top.bin")
+
+    def flash_fw(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0x00A00000, "build/wukong/software/firmware/firmware.fbi")
 
 class Arty(Board):
     SPIFLASH_PAGE_SIZE    = 256
@@ -357,6 +365,7 @@ def main():
     parser.add_argument("--build",          action="store_true",      help="Build bitstream")
     parser.add_argument("--load",           action="store_true",      help="Load bitstream (to SRAM)")
     parser.add_argument("--flash",          action="store_true",      help="Flash bitstream/images (to SPI Flash)")
+    parser.add_argument("--flash_fw",       action="store_true",      help="Flash firmware binary (to SPI Flash)")
     parser.add_argument("--doc",            action="store_true",      help="Build documentation")
     parser.add_argument("--local-ip",       default="192.168.1.50",   help="Local IP address")
     parser.add_argument("--remote-ip",      default="192.168.1.100",  help="Remote IP address of TFTP server")
@@ -393,7 +402,10 @@ def main():
             soc_kwargs.update(with_ethernet=True)
 
         # SoC creation -----------------------------------------------------------------------------
-        soc = SoCLinux(board.soc_cls, **soc_kwargs)
+        if board_name in ["wukong"]:
+            soc = SoCStandAlone(board.soc_cls, **soc_kwargs)
+        else:
+            soc = SoCLinux(board.soc_cls, **soc_kwargs)
 
         # SoC peripherals --------------------------------------------------------------------------
         if "spiflash" in board.soc_capabilities:
@@ -431,21 +443,28 @@ def main():
         # Build ------------------------------------------------------------------------------------
         build_dir = os.path.join("build", board_name)
         builder   = Builder(soc, output_dir=build_dir, csr_json=os.path.join(build_dir, "csr.json"))
+        builder.add_software_package(name="firmware")
         builder.build(run=args.build)
 
         # DTS --------------------------------------------------------------------------------------
-        soc.generate_dts(board_name)
-        soc.compile_dts(board_name)
+        if board_name not in ["wukong"]:
+            soc.generate_dts(board_name)
+            soc.compile_dts(board_name)
 
         # Machine Mode Emulator --------------------------------------------------------------------
-        soc.compile_emulator(board_name)
+        if board_name not in ["wukong"]:
+            soc.compile_emulator(board_name)
 
         # Flash Linux images -----------------------------------------------------------------------
         if args.fbi:
-            os.system("python3 -m litex.soc.software.mkmscimg buildroot/Image -o buildroot/Image.fbi --fbi --little")
-            os.system("python3 -m litex.soc.software.mkmscimg buildroot/rootfs.cpio -o buildroot/rootfs.cpio.fbi --fbi --little")
-            os.system("python3 -m litex.soc.software.mkmscimg buildroot/rv32.dtb -o buildroot/rv32.dtb.fbi --fbi --little")
-            os.system("python3 -m litex.soc.software.mkmscimg emulator/emulator.bin -o emulator/emulator.bin.fbi --fbi --little")
+            if board_name in ["wukong"]:
+                os.system("python3 -m litex.soc.software.mkmscimg build/wukong/software/firmware/firmware.bin \
+                -o build/wukong/software/firmware/firmware.fbi --fbi --little")
+            else:
+                os.system("python3 -m litex.soc.software.mkmscimg buildroot/Image -o buildroot/Image.fbi --fbi --little")
+                os.system("python3 -m litex.soc.software.mkmscimg buildroot/rootfs.cpio -o buildroot/rootfs.cpio.fbi --fbi --little")
+                os.system("python3 -m litex.soc.software.mkmscimg buildroot/rv32.dtb -o buildroot/rv32.dtb.fbi --fbi --little")
+                os.system("python3 -m litex.soc.software.mkmscimg emulator/emulator.bin -o emulator/emulator.bin.fbi --fbi --little")
 
         # Load FPGA bitstream ----------------------------------------------------------------------
         if args.load:
@@ -454,6 +473,10 @@ def main():
         # Flash FPGA bitstream ---------------------------------------------------------------------
         if args.flash:
             board.flash()
+
+        # Flash Linux images -----------------------------------------------------------------------
+        if args.flash_fw:
+            board.flash_fw()
 
         # Generate SoC documentation ---------------------------------------------------------------
         if args.doc:
