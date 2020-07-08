@@ -24,7 +24,7 @@ class Board:
     def flash(self):
         raise NotImplementedError
 
-# Arty support -------------------------------------------------------------------------------------
+# Wukong support -----------------------------------------------------------------------------------
 
 class Wukong(Board):
     SPIFLASH_PAGE_SIZE    = 256
@@ -52,6 +52,37 @@ class Wukong(Board):
             flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0x00A00000, "build/wukong/software/firmware/firmware.fbi")
+
+# Fury support -------------------------------------------------------------------------------------
+
+class Fury(Board):
+    SPIFLASH_PAGE_SIZE    = 256
+    SPIFLASH_SECTOR_SIZE  = 64*kB
+    SPIFLASH_DUMMY_CYCLES = 11
+    def __init__(self):
+        from custom_boards.targets import fury
+        Board.__init__(self, fury.BaseSoC, {"serial"})
+
+    def load(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg")
+        prog.load_bitstream("build/fury/gateware/top.bit")
+
+    def flash(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0, "build/fury/gateware/top.bin")
+
+    def flash_fw(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a35t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0x00A00000, "build/fury/software/firmware/firmware.fbi")
+
+# Arty support -------------------------------------------------------------------------------------
 
 class Arty(Board):
     SPIFLASH_PAGE_SIZE    = 256
@@ -328,6 +359,7 @@ class De0Nano(Board):
 supported_boards = {
     # Xilinx
     "wukong":       Wukong,
+    "fury":         Fury,
     "arty":         Arty,
     "arty_a7":      ArtyA7,
     "arty_s7":      ArtyS7,
@@ -402,7 +434,7 @@ def main():
             soc_kwargs.update(with_ethernet=True)
 
         # SoC creation -----------------------------------------------------------------------------
-        if board_name in ["wukong"]:
+        if board_name in ["wukong", "fury"]:
             soc = SoCStandAlone(board.soc_cls, **soc_kwargs)
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
@@ -447,12 +479,12 @@ def main():
         builder.build(run=args.build)
 
         # DTS --------------------------------------------------------------------------------------
-        if board_name not in ["wukong"]:
+        if board_name not in ["wukong", "fury"]:
             soc.generate_dts(board_name)
             soc.compile_dts(board_name)
 
         # Machine Mode Emulator --------------------------------------------------------------------
-        if board_name not in ["wukong"]:
+        if board_name not in ["wukong", "fury"]:
             soc.compile_emulator(board_name)
 
         # Flash Linux images -----------------------------------------------------------------------
@@ -460,6 +492,9 @@ def main():
             if board_name in ["wukong"]:
                 os.system("python3 -m litex.soc.software.mkmscimg build/wukong/software/firmware/firmware.bin \
                 -o build/wukong/software/firmware/firmware.fbi --fbi --little")
+            elif board_name in ["fury"]:
+                os.system("python3 -m litex.soc.software.mkmscimg build/fury/software/firmware/firmware.bin \
+                -o build/fury/software/firmware/firmware.fbi --fbi --little")                    
             else:
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/Image -o buildroot/Image.fbi --fbi --little")
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/rootfs.cpio -o buildroot/rootfs.cpio.fbi --fbi --little")

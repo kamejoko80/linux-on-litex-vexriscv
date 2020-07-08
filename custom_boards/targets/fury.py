@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# This file is Copyright (c) 2015-2019 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2020 Phuong Dang <kamejokoxx@yahoo.com>
 # License: BSD
 
 import argparse
 
 from migen import *
 
-from custom_boards.platforms import wukong
+from custom_boards.platforms import fury
 from litex.build.xilinx.vivado import vivado_build_args, vivado_build_argdict
 
 from litex.soc.cores.clock import *
@@ -17,8 +17,6 @@ from litex.soc.integration.builder import *
 
 from litedram.modules import MT41K128M16
 from litedram.phy import s7ddrphy
-
-from liteeth.phy.mii import LiteEthPHYMII
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -30,7 +28,6 @@ class _CRG(Module):
         self.clock_domains.cd_sys4x     = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys4x_dqs = ClockDomain(reset_less=True)
         self.clock_domains.cd_clk200    = ClockDomain()
-        self.clock_domains.cd_eth       = ClockDomain()
 
         # POR implementation
         clk50     = platform.request("clk50")
@@ -58,7 +55,6 @@ class _CRG(Module):
         pll.create_clkout(self.cd_sys4x,     int(4*sys_clk_freq))
         pll.create_clkout(self.cd_sys4x_dqs, int(4*sys_clk_freq), phase=90)
         pll.create_clkout(self.cd_clk200,    int(200e6))
-        pll.create_clkout(self.cd_eth,       int(25e6))
 
         self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
 
@@ -69,14 +65,13 @@ class _CRG(Module):
         platform.add_period_constraint(self.cd_sys4x.clk, float(1e9/(4*sys_clk_freq)))
         platform.add_period_constraint(self.cd_sys4x_dqs.clk, float(1e9/(4*sys_clk_freq)))
         platform.add_period_constraint(self.cd_clk200.clk, float(1e9/200e6))
-        platform.add_period_constraint(self.cd_eth.clk, float(1e9/25e6))
-        platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk50_IBUF]")
+        #platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk50_IBUF]")
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=int(100e6), with_ethernet=False, with_etherbone=False, **kwargs):
-        platform = wukong.Platform()
+        platform = fury.Platform()
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, clk_freq=sys_clk_freq, csr_data_width=32, **kwargs)
@@ -105,12 +100,10 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="LiteX SoC on Wukong board")
+    parser = argparse.ArgumentParser(description="LiteX SoC on Fury board")
     builder_args(parser)
     soc_sdram_args(parser)
     vivado_build_args(parser)
-    parser.add_argument("--with-ethernet", action="store_true", help="enable Ethernet support")
-    parser.add_argument("--with-etherbone", action="store_true", help="enable Etherbone support")
     args = parser.parse_args()
 
     soc = BaseSoC(with_ethernet=False, with_etherbone=False,
