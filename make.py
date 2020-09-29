@@ -232,6 +232,15 @@ class MiniSpartan6(Board):
     def load(self):
         os.system("xc3sprog -c ftdi build/minispartan6/gateware/top.bit")
 
+# Spartan6 Core Board support ----------------------------------------------------------------------
+
+class Sp6Core(Board):
+    def __init__(self):
+        from custom_boards.targets import sp6core
+        Board.__init__(self, sp6core.BaseSoC, {"serial"})
+
+    def load(self):
+        os.system("xc3sprog -c ftdi build/sp6core/gateware/top.bit")        
 
 # Pipistrello support ------------------------------------------------------------------------------
 
@@ -371,6 +380,7 @@ supported_boards = {
     "nexys4ddr":    Nexys4DDR,
     "nexys_video":  NexysVideo,
     "minispartan6": MiniSpartan6,
+    "sp6core":      Sp6Core,    
     "pipistrello":  Pipistrello,
 
     # Lattice
@@ -434,7 +444,7 @@ def main():
             soc_kwargs.update(with_ethernet=True)
 
         # SoC creation -----------------------------------------------------------------------------
-        if board_name in ["wukong", "fury"]:
+        if board_name in ["wukong", "fury", "sp6core"]:
             soc = SoCStandAlone(board.soc_cls, **soc_kwargs)
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
@@ -479,12 +489,12 @@ def main():
         builder.build(run=args.build)
 
         # DTS --------------------------------------------------------------------------------------
-        if board_name not in ["wukong", "fury"]:
+        if board_name not in ["wukong", "fury", "sp6core"]:
             soc.generate_dts(board_name)
             soc.compile_dts(board_name)
 
         # Machine Mode Emulator --------------------------------------------------------------------
-        if board_name not in ["wukong", "fury"]:
+        if board_name not in ["wukong", "fury", "sp6core"]:
             soc.compile_emulator(board_name)
 
         # Flash Linux images -----------------------------------------------------------------------
