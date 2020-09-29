@@ -98,16 +98,20 @@ _io = [
     ),
 
     ("serwb_master", 0,
-        Subsignal("clk",  Pins("C9"), IOStandard("TMDS_33")),
-        Subsignal("tx",   Pins("A9"), IOStandard("TMDS_33")),
-        Subsignal("rx",   Pins("C7"), IOStandard("TMDS_33")),
+        Subsignal("clk",  Pins("C9")),
+        Subsignal("tx",   Pins("A9")),
+        Subsignal("rx",   Pins("C7")),
+        Misc("SLEW=FAST"),
+        IOStandard("LVCMOS33"),
     ),
 
     ("serwb_slave", 0,
-        Subsignal("clk",  Pins("B14"), IOStandard("TMDS_33")),
-        Subsignal("tx",   Pins("A14"), IOStandard("TMDS_33")),
-        Subsignal("rx",   Pins("C13"), IOStandard("TMDS_33")),
-    )
+        Subsignal("clk",  Pins("B14")),
+        Subsignal("tx",   Pins("A14")),
+        Subsignal("rx",   Pins("C13")),
+        Misc("SLEW=FAST"),
+        IOStandard("LVCMOS33"),
+    ),
 
     ("serwb_enable", 0, Pins("C1"), IOStandard("LVCMOS33")),
 ]
@@ -130,7 +134,7 @@ class Platform(XilinxPlatform):
     default_clk_period = 1e9/32e6
 
     def __init__(self, device="xc6slx25"):
-        assert device in ["xc6slx9", "xc6slx25"]
+        assert device in ["xc6slx16", "xc6slx25"]
         XilinxPlatform.__init__(self, device+"-3-ftg256", _io, _connectors)
 
     def create_programmer(self):

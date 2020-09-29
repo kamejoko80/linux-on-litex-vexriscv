@@ -42,7 +42,7 @@ class _CRG(Module):
 
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=int(80e6), **kwargs):
-        platform = sp6core.Platform()
+        platform = sp6core.Platform(device="xc6slx16")
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, 
@@ -67,6 +67,52 @@ class BaseSoC(SoCCore):
                 l2_cache_reverse        = True
             )
 
+class SERDESSoC(BaseSoC):
+    csr_map = {
+        "serwb_master_phy": 20,
+        "serwb_slave_phy":  21
+    }
+    csr_map.update(BaseSoC.csr_map)
+
+    mem_map = {
+        "serwb": 0x30000000,
+    }
+    mem_map.update(BaseSoC.mem_map)
+
+    def __init__(self, platform):
+
+        BaseSoC.__init__(self, platform)
+
+        # serwb enable
+        self.comb += platform.request("serwb_enable").eq(1)
+
+        # serwb master
+        self.submodules.serwb_master_phy = SERWBLowSpeedPHY(platform.device, platform.request("serwb_master"), mode="master")
+
+        # serwb slave
+        self.submodules.serwb_slave_phy = SERWBLowSpeedPHY(platform.device, platform.request("serwb_slave"), mode="slave")
+
+        # leds
+        self.comb += [
+            platform.request("user_led", 4).eq(self.serwb_master_phy.init.ready),
+            platform.request("user_led", 5).eq(self.serwb_master_phy.init.error),
+            platform.request("user_led", 6).eq(self.serwb_slave_phy.init.ready),
+            platform.request("user_led", 7).eq(self.serwb_slave_phy.init.error),
+        ]
+
+        # wishbone slave
+        serwb_master_core = SERWBCore(self.serwb_master_phy, self.clk_freq, mode="slave")
+        self.submodules += serwb_master_core
+
+        # wishbone master
+        serwb_slave_core = SERWBCore(self.serwb_slave_phy, self.clk_freq, mode="master")
+        self.submodules += serwb_slave_core
+
+        # wishbone test memory
+        self.register_mem("serwb", self.mem_map["serwb"], serwb_master_core.etherbone.wishbone.bus, 8192)
+        self.submodules.serwb_sram = wishbone.SRAM(8192, init=[i for i in range(8192//4)])
+        self.comb += serwb_slave_core.etherbone.wishbone.bus.connect(self.serwb_sram.bus)
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
@@ -75,7 +121,7 @@ def main():
     soc_sdram_args(parser)
     args = parser.parse_args()
 
-    soc = BaseSoC(**soc_sdram_argdict(args))
+    soc = SERDESSoC(**soc_sdram_argdict(args))
     builder = Builder(soc, **builder_argdict(args))
     builder.build()
 
