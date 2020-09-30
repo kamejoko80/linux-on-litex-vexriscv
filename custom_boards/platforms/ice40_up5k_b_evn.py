@@ -9,6 +9,10 @@ _io = [
         IOStandard("LVCMOS33")
     ),
 
+    ("user_led", 0, Pins("41"), IOStandard("LVCMOS33")),  # RGB LED R
+    ("user_led", 1, Pins("40"),  IOStandard("LVCMOS33")), # RGB LED G
+    ("user_led", 2, Pins("39"),  IOStandard("LVCMOS33")), # RGB LED B
+    
     ("user_sw", 0, Pins("23"), IOStandard("LVCMOS33")),
     ("user_sw", 1, Pins("25"), IOStandard("LVCMOS33")),
     ("user_sw", 2, Pins("34"), IOStandard("LVCMOS33")),
@@ -49,6 +53,22 @@ _io = [
         Subsignal("irq", Pins("10"), IOStandard("LVCMOS33")),  # J3 18A    IOB_18A
     ),     
     
+    ("serwb_master", 0,
+        Subsignal("clk",  Pins("4")),  # J3 8A     IOB_8A
+        Subsignal("tx",   Pins("3")),  # J3 9B     IOB_9B
+        Subsignal("rx",   Pins("48")), # J3 4A     IOB_4A
+        IOStandard("LVCMOS33"),
+    ),
+
+    ("serwb_slave", 0,
+        Subsignal("clk",  Pins("20")), # J3 25B_G3 IOB_25B_G3
+        Subsignal("tx",   Pins("19")), # J3 29B    IOB_29B
+        Subsignal("rx",   Pins("18")), # J3 31B    IOB_31B
+        IOStandard("LVCMOS33"),
+    ),
+
+    ("serwb_enable", 0, Pins("11"), IOStandard("LVCMOS33")), # J3 20A    IOB_20A
+
     ("clk12", 0, Pins("35"), IOStandard("LVCMOS33"))
 ]
 

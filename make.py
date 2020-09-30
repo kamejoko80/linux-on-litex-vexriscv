@@ -241,7 +241,7 @@ class Sp6Core(Board):
         Board.__init__(self, sp6core.BaseSoC, {"serial"})
 
     def load(self):
-        os.system("xc3sprog -c ftdi build/sp6core/gateware/top.bit")        
+        os.system("xc3sprog -c ftdi build/sp6core/gateware/top.bit")
 
 # Pipistrello support ------------------------------------------------------------------------------
 
@@ -400,7 +400,7 @@ supported_boards = {
     "nexys4ddr":        Nexys4DDR,
     "nexys_video":      NexysVideo,
     "minispartan6":     MiniSpartan6,
-    "sp6core":          Sp6Core,    
+    "sp6core":          Sp6Core,
     "pipistrello":      Pipistrello,
 
     # Lattice
@@ -428,8 +428,8 @@ def main():
     parser.add_argument("--build",          action="store_true",      help="Build bitstream")
     parser.add_argument("--load",           action="store_true",      help="Load bitstream (to SRAM)")
     parser.add_argument("--flash",          action="store_true",      help="Flash bitstream/images (to SPI Flash)")
-    parser.add_argument("--flash_gw",       action="store_true",      help="Flash bitstream (to SPI Flash)")    
-    parser.add_argument("--flash_bios",     action="store_true",      help="Flash bios binary (to SPI Flash)")    
+    parser.add_argument("--flash_gw",       action="store_true",      help="Flash bitstream (to SPI Flash)")
+    parser.add_argument("--flash_bios",     action="store_true",      help="Flash bios binary (to SPI Flash)")
     parser.add_argument("--flash_fw",       action="store_true",      help="Flash firmware binary (to SPI Flash)")
     parser.add_argument("--doc",            action="store_true",      help="Build documentation")
     parser.add_argument("--local-ip",       default="192.168.1.50",   help="Local IP address")
@@ -530,7 +530,7 @@ def main():
                 -o build/wukong/software/firmware/firmware.fbi --fbi --little")
             elif board_name in ["fury"]:
                 os.system("python3 -m litex.soc.software.mkmscimg build/fury/software/firmware/firmware.bin \
-                -o build/fury/software/firmware/firmware.fbi --fbi --little")                    
+                -o build/fury/software/firmware/firmware.fbi --fbi --little")
             else:
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/Image -o buildroot/Image.fbi --fbi --little")
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/rootfs.cpio -o buildroot/rootfs.cpio.fbi --fbi --little")
