@@ -8,6 +8,7 @@ from litex.soc.integration.builder import Builder
 
 from soc_linux import SoCLinux, video_resolutions
 from soc_standalone import SoCStandAlone, video_resolutions
+from soc_ice40up import SoCIce40Up
 
 kB = 1024
 
@@ -277,6 +278,25 @@ class ULX3S(Board):
     def load(self):
         os.system("ujprog build/ulx3s/gateware/top.svf")
 
+# ICE40 UP5K support -------------------------------------------------------------------------------
+
+class ICE40_UP5K_B_EVN(Board):
+    def __init__(self):
+        from custom_boards.targets import ice40_up5k_b_evn
+        Board.__init__(self, ice40_up5k_b_evn.BaseSoC, {"serial"})
+
+    def flash_gw(self):
+        print("Flash gateware image")
+        os.system("iceprog -o 0 build/ice40_up5k_b_evn/gateware/top.bin")
+
+    def flash_bios(self):
+        print("Flash bios image")
+        os.system("iceprog -o 0x20000 build/ice40_up5k_b_evn/software/bios/bios.bin")
+
+    def flash_fw(self):
+        print("Flash frimware image")
+        os.system("iceprog -o 0x30000 build/ice40_up5k_b_evn/software/firmware/firmware.bin")
+
 # HADBadge support ---------------------------------------------------------------------------------
 
 class HADBadge(Board):
@@ -367,34 +387,35 @@ class De0Nano(Board):
 
 supported_boards = {
     # Xilinx
-    "wukong":       Wukong,
-    "fury":         Fury,
-    "arty":         Arty,
-    "arty_a7":      ArtyA7,
-    "arty_s7":      ArtyS7,
-    "netv2":        NeTV2,
-    "genesys2":     Genesys2,
-    "kc705":        KC705,
-    "kcu105":       KCU105,
-    "zcu104":       ZCU104,
-    "nexys4ddr":    Nexys4DDR,
-    "nexys_video":  NexysVideo,
-    "minispartan6": MiniSpartan6,
-    "sp6core":      Sp6Core,    
-    "pipistrello":  Pipistrello,
+    "wukong":           Wukong,
+    "fury":             Fury,
+    "arty":             Arty,
+    "arty_a7":          ArtyA7,
+    "arty_s7":          ArtyS7,
+    "netv2":            NeTV2,
+    "genesys2":         Genesys2,
+    "kc705":            KC705,
+    "kcu105":           KCU105,
+    "zcu104":           ZCU104,
+    "nexys4ddr":        Nexys4DDR,
+    "nexys_video":      NexysVideo,
+    "minispartan6":     MiniSpartan6,
+    "sp6core":          Sp6Core,    
+    "pipistrello":      Pipistrello,
 
     # Lattice
-    "versa_ecp5":   VersaECP5,
-    "ulx3s":        ULX3S,
-    "hadbadge":     HADBadge,
-    "orangecrab":   OrangeCrab,
-    "camlink_4k":   CamLink4K,
-    "trellisboard": TrellisBoard,
+    "versa_ecp5":       VersaECP5,
+    "ulx3s":            ULX3S,
+    "ice40_up5k_b_evn": ICE40_UP5K_B_EVN,
+    "hadbadge":         HADBadge,
+    "orangecrab":       OrangeCrab,
+    "camlink_4k":       CamLink4K,
+    "trellisboard":     TrellisBoard,
 
     # Altera/Intel
-    "de0nano":      De0Nano,
-    "de10lite":     De10Lite,
-    "de10nano":     De10Nano,
+    "de0nano":          De0Nano,
+    "de10lite":         De10Lite,
+    "de10nano":         De10Nano,
 }
 
 def main():
@@ -407,6 +428,8 @@ def main():
     parser.add_argument("--build",          action="store_true",      help="Build bitstream")
     parser.add_argument("--load",           action="store_true",      help="Load bitstream (to SRAM)")
     parser.add_argument("--flash",          action="store_true",      help="Flash bitstream/images (to SPI Flash)")
+    parser.add_argument("--flash_gw",       action="store_true",      help="Flash bitstream (to SPI Flash)")    
+    parser.add_argument("--flash_bios",     action="store_true",      help="Flash bios binary (to SPI Flash)")    
     parser.add_argument("--flash_fw",       action="store_true",      help="Flash firmware binary (to SPI Flash)")
     parser.add_argument("--doc",            action="store_true",      help="Build documentation")
     parser.add_argument("--local-ip",       default="192.168.1.50",   help="Local IP address")
@@ -431,7 +454,8 @@ def main():
 
         # SoC parameters (and override for boards that don't support default parameters) -----------
         soc_kwargs = {}
-        soc_kwargs.update(integrated_rom_size=0x8000)
+        if board_name not in ["ice40_up5k_b_evn"]:
+            soc_kwargs.update(integrated_rom_size=0x8000)
         if board_name in ["de0nano"]:
             soc_kwargs.update(l2_size=2048) # Not enough blockrams for default l2_size of 8192
         if board_name in ["kc705"]:
@@ -446,6 +470,8 @@ def main():
         # SoC creation -----------------------------------------------------------------------------
         if board_name in ["wukong", "fury", "sp6core"]:
             soc = SoCStandAlone(board.soc_cls, **soc_kwargs)
+        elif board_name in ["ice40_up5k_b_evn"]:
+            soc = SoCIce40Up(board.soc_cls, **soc_kwargs)
         else:
             soc = SoCLinux(board.soc_cls, **soc_kwargs)
 
@@ -489,12 +515,12 @@ def main():
         builder.build(run=args.build)
 
         # DTS --------------------------------------------------------------------------------------
-        if board_name not in ["wukong", "fury", "sp6core"]:
+        if board_name not in ["wukong", "fury", "sp6core", "ice40_up5k_b_evn"]:
             soc.generate_dts(board_name)
             soc.compile_dts(board_name)
 
         # Machine Mode Emulator --------------------------------------------------------------------
-        if board_name not in ["wukong", "fury", "sp6core"]:
+        if board_name not in ["wukong", "fury", "sp6core", "ice40_up5k_b_evn"]:
             soc.compile_emulator(board_name)
 
         # Flash Linux images -----------------------------------------------------------------------
@@ -515,9 +541,17 @@ def main():
         if args.load:
             board.load()
 
-        # Flash FPGA bitstream ---------------------------------------------------------------------
+        # Flash FPGA bitstream & bios --------------------------------------------------------------
         if args.flash:
             board.flash()
+
+        # Flash FPGA bitstream only ----------------------------------------------------------------
+        if args.flash_gw:
+            board.flash_gw()
+
+        # Flash FPGA bios only ---------------------------------------------------------------------
+        if args.flash_bios:
+            board.flash_bios()
 
         # Flash Linux images -----------------------------------------------------------------------
         if args.flash_fw:
