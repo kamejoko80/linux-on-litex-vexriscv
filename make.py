@@ -33,7 +33,7 @@ class Wukong(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import wukong
-        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma"})
+        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma", "serwb"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -486,6 +486,8 @@ def main():
             soc.configure_ethernet(local_ip=args.local_ip, remote_ip=args.remote_ip)
         if "leds" in board.soc_capabilities:
             soc.add_leds()
+        if "serwb" in board.soc_capabilities:
+            soc.add_serwb()
         if "rgb_led" in board.soc_capabilities:
             soc.add_rgb_led()
         if "switches" in board.soc_capabilities:

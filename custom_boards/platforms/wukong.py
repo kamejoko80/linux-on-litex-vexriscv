@@ -83,6 +83,22 @@ _io = [
         Subsignal("crs",     Pins("U2")),
         IOStandard("LVCMOS33"),
     ),
+    
+    ("serwb_master", 0,
+        Subsignal("clk",  Pins("U21")), # J12 31
+        Subsignal("tx",   Pins("T20")), # J12 33
+        Subsignal("rx",   Pins("T19")), # J12 35
+        IOStandard("LVCMOS33"),
+    ),
+
+    ("serwb_slave", 0,
+        Subsignal("clk",  Pins("V21")), # J12 32
+        Subsignal("tx",   Pins("U19")), # J12 36
+        Subsignal("rx",   Pins("U20")), # J12 34
+        IOStandard("LVCMOS33"),
+    ),
+
+    ("serwb_enable", 0, Pins("D6"), IOStandard("LVCMOS33")),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------
