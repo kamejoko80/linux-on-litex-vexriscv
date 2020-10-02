@@ -33,7 +33,7 @@ class Wukong(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import wukong
-        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma", "serwb"})
+        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma", "serwb_master"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -53,6 +53,35 @@ class Wukong(Board):
             flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
         prog.set_flash_proxy_dir(".")
         prog.flash(0x00A00000, "build/wukong/software/firmware/firmware.fbi")
+        
+# At7core support ---------------------------------------------------------------------------------
+
+class At7Core(Board):
+    SPIFLASH_PAGE_SIZE    = 256
+    SPIFLASH_SECTOR_SIZE  = 64*kB
+    SPIFLASH_DUMMY_CYCLES = 11
+    def __init__(self):
+        from custom_boards.targets import at7core
+        Board.__init__(self, at7core.BaseSoC, {"serial", "spiflash", "serwb_slave"})
+
+    def load(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg")
+        prog.load_bitstream("build/at7core/gateware/top.bit")
+
+    def flash(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0, "build/at7core/gateware/top.bin")
+
+    def flash_fw(self):
+        from litex.build.openocd import OpenOCD
+        prog = OpenOCD("prog/openocd_xilinx_platform_cable.cfg",
+            flash_proxy_basename="prog/bscan_spi_xc7a100t.bit")
+        prog.set_flash_proxy_dir(".")
+        prog.flash(0x00A00000, "build/at7core/software/firmware/firmware.fbi")
 
 # Fury support -------------------------------------------------------------------------------------
 
@@ -388,6 +417,7 @@ class De0Nano(Board):
 supported_boards = {
     # Xilinx
     "wukong":           Wukong,
+    "at7core":          At7Core,
     "fury":             Fury,
     "arty":             Arty,
     "arty_a7":          ArtyA7,
@@ -468,7 +498,7 @@ def main():
             soc_kwargs.update(with_ethernet=True)
 
         # SoC creation -----------------------------------------------------------------------------
-        if board_name in ["wukong", "fury", "sp6core"]:
+        if board_name in ["wukong", "fury", "at7core", "sp6core"]:
             soc = SoCStandAlone(board.soc_cls, **soc_kwargs)
         elif board_name in ["ice40_up5k_b_evn"]:
             soc = SoCIce40Up(board.soc_cls, **soc_kwargs)
@@ -486,8 +516,10 @@ def main():
             soc.configure_ethernet(local_ip=args.local_ip, remote_ip=args.remote_ip)
         if "leds" in board.soc_capabilities:
             soc.add_leds()
-        if "serwb" in board.soc_capabilities:
-            soc.add_serwb()
+        if "serwb_master" in board.soc_capabilities:
+            soc.add_serwb_master()
+        if "serwb_slave" in board.soc_capabilities:
+            soc.add_serwb_slave()            
         if "rgb_led" in board.soc_capabilities:
             soc.add_rgb_led()
         if "switches" in board.soc_capabilities:
@@ -517,12 +549,12 @@ def main():
         builder.build(run=args.build)
 
         # DTS --------------------------------------------------------------------------------------
-        if board_name not in ["wukong", "fury", "sp6core", "ice40_up5k_b_evn"]:
+        if board_name not in ["wukong", "at7core", "fury", "sp6core", "ice40_up5k_b_evn"]:
             soc.generate_dts(board_name)
             soc.compile_dts(board_name)
 
         # Machine Mode Emulator --------------------------------------------------------------------
-        if board_name not in ["wukong", "fury", "sp6core", "ice40_up5k_b_evn"]:
+        if board_name not in ["wukong", "at7core", "fury", "sp6core", "ice40_up5k_b_evn"]:
             soc.compile_emulator(board_name)
 
         # Flash Linux images -----------------------------------------------------------------------
@@ -533,6 +565,9 @@ def main():
             elif board_name in ["fury"]:
                 os.system("python3 -m litex.soc.software.mkmscimg build/fury/software/firmware/firmware.bin \
                 -o build/fury/software/firmware/firmware.fbi --fbi --little")
+            elif board_name in ["at7core"]:
+                os.system("python3 -m litex.soc.software.mkmscimg build/at7core/software/firmware/firmware.bin \
+                -o build/at7core/software/firmware/firmware.fbi --fbi --little")                
             else:
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/Image -o buildroot/Image.fbi --fbi --little")
                 os.system("python3 -m litex.soc.software.mkmscimg buildroot/rootfs.cpio -o buildroot/rootfs.cpio.fbi --fbi --little")
