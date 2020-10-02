@@ -21,6 +21,9 @@ from litevideo.output import VideoOut
 from liteiclink.serwb.phy import SERWBPHY
 from liteiclink.serwb.genphy import SERWBPHY as SERWBLowSpeedPHY
 from liteiclink.serwb.core import SERWBCore
+from liteiclink import serwb
+
+from litex.soc.interconnect.wishbone import SRAM
 
 # Predefined values --------------------------------------------------------------------------------
 
@@ -82,8 +85,6 @@ def SoCStandAlone(soc_cls, **kwargs):
             "ctrl":               0,
             "uart":               2,
             "timer0":             3,
-            "serwb_master_phy":  20,
-            "serwb_slave_phy":   21,
         }}
         interrupt_map = {**soc_cls.interrupt_map, **{
             "uart":       0,
@@ -113,45 +114,45 @@ def SoCStandAlone(soc_cls, **kwargs):
         # serwb master -----------------------------------------------------------------------------
         def add_serwb_master(self):
 
-            # serwb enable
-            self.comb += self.platform.request("serwb_enable").eq(1)
-
             # serwb master
-            self.submodules.serwb_master_phy = SERWBLowSpeedPHY(self.platform.device, self.platform.request("serwb_master"), mode="master")
+            serwb_pads = self.platform.request("serwb_master")
+            self.platform.add_period_constraint(serwb_pads.clk, 8.)
+            serwb_master_phy = serwb.genphy.SERWBPHY(self.platform.device, serwb_pads, mode="master")
+            self.submodules.serwb_master_phy = serwb_master_phy
+            self.add_csr("serwb_master_phy")
 
             # leds
             self.comb += [
-                self.platform.request("user_led", 0).eq(self.serwb_master_phy.init.ready),
+                self.platform.request("user_led", 0).eq(serwb_master_phy.init.ready),
             ]
 
             # wishbone master
-            serwb_master_core = SERWBCore(self.serwb_master_phy, self.clk_freq, mode="master")
+            serwb_master_core = serwb.core.SERWBCore(serwb_master_phy, self.clk_freq, mode="slave")
             self.submodules += serwb_master_core
 
-            # wishbone test memory
-            self.register_mem("serwb", self.mem_map["serwb"], serwb_master_core.etherbone.wishbone.bus, 1024)
+            self.add_memory_region("serwb", self.mem_map["serwb"], 1024, type="cached+linker")
+            self.add_wb_slave(self.mem_map["serwb"], serwb_master_core.etherbone.wishbone.bus, 1024)
 
-        # serwb slave ------------------------------------------------------------------------------            
+        # serwb slave ------------------------------------------------------------------------------
         def add_serwb_slave(self):
 
-            # serwb enable
-            self.comb += self.platform.request("serwb_enable").eq(1)
-
             # serwb slave
-            self.submodules.serwb_slave_phy = SERWBLowSpeedPHY(self.platform.device, self.platform.request("serwb_slave"), mode="slave")
+            serwb_pads = self.platform.request("serwb_slave")
+            self.platform.add_period_constraint(serwb_pads.clk, 8.)
+            serwb_slave_phy = serwb.genphy.SERWBPHY(self.platform.device, serwb_pads, mode="slave")
+            self.submodules.serwb_slave_phy = serwb_slave_phy
+            self.add_csr("serwb_slave_phy")
 
             # leds
             self.comb += [
-                self.platform.request("user_led", 1).eq(self.serwb_slave_phy.init.ready),
+                self.platform.request("user_led", 1).eq(serwb_slave_phy.init.ready),
             ]
 
-            # wishbone slave
-            serwb_slave_core = SERWBCore(self.serwb_slave_phy, self.clk_freq, mode="slave")
+            serwb_slave_core = serwb.core.SERWBCore(serwb_slave_phy, self.clk_freq, mode="master")
             self.submodules += serwb_slave_core
 
-            # wishbone test memory
-            self.submodules.serwb_sram = wishbone.SRAM(1024, init=[i for i in range(1024//4)])
-            self.comb += serwb_slave_core.etherbone.wishbone.bus.connect(self.serwb_sram.bus)
+            # expose wishbone slave
+            self.wishbone = serwb_slave_core.etherbone.wishbone.bus
 
         # Leds -------------------------------------------------------------------------------------
         def add_leds(self):

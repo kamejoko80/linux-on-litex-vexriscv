@@ -33,7 +33,7 @@ class Wukong(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import wukong
-        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma", "serwb_master"})
+        Board.__init__(self, wukong.BaseSoC, {"serial", "spiflash", "spi", "spidma", "serwb_master", "serwb_slave"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -62,7 +62,7 @@ class At7Core(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import at7core
-        Board.__init__(self, at7core.BaseSoC, {"serial", "spiflash", "serwb_slave"})
+        Board.__init__(self, at7core.BaseSoC, {"serial", "spiflash", "serwb_master", "serwb_slave"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
