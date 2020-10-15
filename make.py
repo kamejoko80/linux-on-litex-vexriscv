@@ -62,7 +62,7 @@ class At7Core(Board):
     SPIFLASH_DUMMY_CYCLES = 11
     def __init__(self):
         from custom_boards.targets import at7core
-        Board.__init__(self, at7core.BaseSoC, {"serial", "spiflash", "serwb_master", "serwb_slave"})
+        Board.__init__(self, at7core.BaseSoC, {"serial", "spiflash", "serwb_master", "serwb_slave", "spi_array"})
 
     def load(self):
         from litex.build.openocd import OpenOCD
@@ -519,7 +519,9 @@ def main():
         if "serwb_master" in board.soc_capabilities:
             soc.add_serwb_master()
         if "serwb_slave" in board.soc_capabilities:
-            soc.add_serwb_slave()            
+            soc.add_serwb_slave()
+        if "spi_array" in board.soc_capabilities:
+            soc.add_spi_array()
         if "rgb_led" in board.soc_capabilities:
             soc.add_rgb_led()
         if "switches" in board.soc_capabilities:

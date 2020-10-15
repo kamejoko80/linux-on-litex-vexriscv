@@ -25,6 +25,8 @@ from liteiclink import serwb
 
 from litex.soc.interconnect.wishbone import SRAM
 
+from custom_ipcores.misc import *
+
 # Predefined values --------------------------------------------------------------------------------
 
 video_resolutions = {
@@ -111,6 +113,12 @@ def SoCStandAlone(soc_cls, **kwargs):
             self.add_memory_region("emulator", self.mem_map["main_ram"] + 0x01100000, 0x4000,
                 type="cached+linker")
 
+        # spi array master -------------------------------------------------------------------------
+        def add_spi_array(self):
+            spi_pads = self.platform.request("spi_array")
+            self.submodules.spi_array = SPIArrayMaster(freq=self.clk_freq, baudrate=1000000, pads=spi_pads)
+            self.add_csr("spi_array")
+            
         # serwb master -----------------------------------------------------------------------------
         def add_serwb_master(self):
 

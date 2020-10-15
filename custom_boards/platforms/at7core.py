@@ -52,6 +52,19 @@ _io = [
     ),
 
     ("serwb_enable", 0, Pins("C23"), IOStandard("LVCMOS33")), # U4 13
+
+    ("spi_array", 0,
+        Subsignal("sck_0",  Pins("AC26")), # U4 59
+        Subsignal("sck_1",  Pins("AB26")), # U4 60
+        Subsignal("mosi_0", Pins("AB25")), # U4 57
+        Subsignal("mosi_1", Pins("AA24")), # U4 58
+        Subsignal("miso_0", Pins("AA25")), # U4 55
+        Subsignal("miso_1", Pins("Y25")),  # U4 56
+        Subsignal("csn_0",  Pins("W24")),  # U4 53
+        Subsignal("csn_1",  Pins("V24")),  # U4 54
+        Subsignal("irq",    Pins("Y26")),  # U4 51
+        IOStandard("LVCMOS33"),
+    ),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------

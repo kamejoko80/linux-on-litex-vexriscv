@@ -36,7 +36,7 @@ _io = [
         Subsignal("sink_ready", Pins()),
         Subsignal("sink_data", Pins(8)),
     ),
-    ("spi_multi", 0,
+    ("spi_array", 0,
 
         # sck array
         Subsignal("sck_0", Pins(1)),
@@ -409,7 +409,7 @@ def SPIArrayMasterTestBench(dut):
 
 if __name__ == "__main__":
     platform = Platform()
-    spi_pads = platform.request("spi_multi")
+    spi_pads = platform.request("spi_array")
     dut = SPIArrayMaster(freq=50000000, baudrate=1000000, pads=spi_pads)
     print(verilog.convert(SPIArrayMaster(freq=50000000, baudrate=1000000, pads=spi_pads)))
     run_simulation(dut, SPIArrayMasterTestBench(dut), clocks={"sys": 10}, vcd_name="SPIArrayMaster.vcd")
