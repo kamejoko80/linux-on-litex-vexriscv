@@ -456,6 +456,7 @@ def main():
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--board",          required=True,            help="FPGA board")
     parser.add_argument("--build",          action="store_true",      help="Build bitstream")
+    parser.add_argument("--build_sw",       action="store_true",      help="build software only")
     parser.add_argument("--load",           action="store_true",      help="Load bitstream (to SRAM)")
     parser.add_argument("--flash",          action="store_true",      help="Flash bitstream/images (to SPI Flash)")
     parser.add_argument("--flash_gw",       action="store_true",      help="Flash bitstream (to SPI Flash)")
@@ -546,9 +547,16 @@ def main():
 
         # Build ------------------------------------------------------------------------------------
         build_dir = os.path.join("build", board_name)
-        builder   = Builder(soc, output_dir=build_dir, csr_json=os.path.join(build_dir, "csr.json"))
-        builder.add_software_package(name="firmware")
-        builder.build(run=args.build)
+
+        if args.build:
+            builder = Builder(soc, output_dir=build_dir, csr_json=os.path.join(build_dir, "csr.json"))
+            builder.add_software_package(name="firmware")
+            builder.build(run=args.build)
+
+        if args.build_sw:
+            builder = Builder(soc, output_dir=build_dir, csr_json=os.path.join(build_dir, "csr.json"), compile_gateware=False)
+            builder.add_software_package(name="firmware")
+            builder.build(run=args.build)            
 
         # DTS --------------------------------------------------------------------------------------
         if board_name not in ["wukong", "at7core", "fury", "sp6core", "ice40_up5k_b_evn"]:
