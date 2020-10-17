@@ -24,10 +24,10 @@ _io = [
     ),
 
     ("spi", 0,
-        Subsignal("clk",  Pins("AB26")), # G8
-        Subsignal("cs_n", Pins("AC26")), # D5
-        Subsignal("mosi", Pins("AB24")), # G5
-        Subsignal("miso", Pins("AC24")), # G7
+        Subsignal("clk",  Pins("G8")), # J10 G8
+        Subsignal("cs_n", Pins("D5")), # J10 D5
+        Subsignal("mosi", Pins("G5")), # J10 G5
+        Subsignal("miso", Pins("G7")), # J10 G7
         IOStandard("LVCMOS33"),
     ),
 
@@ -99,6 +99,19 @@ _io = [
     ),
 
     ("serwb_enable", 0, Pins("D6"), IOStandard("LVCMOS33")),
+
+    ("spi_array", 0,
+        Subsignal("sck_0",  Pins("AB26")), # J12 03
+        Subsignal("sck_1",  Pins("AC26")), # J12 04
+        Subsignal("mosi_0", Pins("AB24")), # J12 05
+        Subsignal("mosi_1", Pins("AC24")), # J12 06
+        Subsignal("miso_0", Pins("AA24")), # J12 07
+        Subsignal("miso_1", Pins("AB25")), # J12 08
+        Subsignal("csn_0",  Pins("AA22")), # J12 09
+        Subsignal("csn_1",  Pins("AA23")), # J12 10
+        Subsignal("irq",    Pins("Y25")),  # J12 11
+        IOStandard("LVCMOS33"),
+    ),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------
