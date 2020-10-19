@@ -142,7 +142,7 @@ class SPIArrayMaster(Module, AutoCSR):
         self.rx_data_7 = CSRStatus(8) # miso line 7
 
         # Internal signals
-        self.prescaler = Signal(max=int(freq/baudrate))
+        self.prescaler = Signal(max=int(freq/(2*baudrate)))
         self.frame     = Signal(reset=1)
         self.spi_clk   = Signal()
         self.tx_buf    = Signal(8)
@@ -154,7 +154,7 @@ class SPIArrayMaster(Module, AutoCSR):
         # SPI clock generation
         self.sync += [
             If(~self.frame,
-                If(self.prescaler == int(freq/baudrate),
+                If(self.prescaler == (int(freq/(2*baudrate)) - 1),
                     self.prescaler.eq(0),
                     self.edge_cnt.eq(self.edge_cnt + 1),
                     If(self.edge_cnt < 16,
