@@ -116,7 +116,7 @@ def SoCStandAlone(soc_cls, **kwargs):
         # spi array master -------------------------------------------------------------------------
         def add_spi_array(self):
             spi_pads = self.platform.request("spi_array")
-            self.submodules.spi_array = SPIArrayMaster(freq=self.clk_freq, baudrate=1000000, pads=spi_pads)
+            self.submodules.spi_array = SPIArrayMaster(freq=self.clk_freq, baudrate=10000000, pads=spi_pads)
             self.add_csr("spi_array")
             
         # serwb master -----------------------------------------------------------------------------
