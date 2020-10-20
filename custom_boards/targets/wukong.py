@@ -54,22 +54,22 @@ class _CRG(Module):
         self.comb += pll.reset.eq(self.reset)
         pll.register_clkin(clk50,            int(50e6))
         pll.create_clkout(self.cd_sys,       int(1*sys_clk_freq))
-        pll.create_clkout(self.cd_sys2x,     int(2*sys_clk_freq))
-        pll.create_clkout(self.cd_sys4x,     int(4*sys_clk_freq))
-        pll.create_clkout(self.cd_sys4x_dqs, int(4*sys_clk_freq), phase=90)
-        pll.create_clkout(self.cd_clk200,    int(200e6))
-        pll.create_clkout(self.cd_eth,       int(25e6))
+        # pll.create_clkout(self.cd_sys2x,     int(2*sys_clk_freq))
+        # pll.create_clkout(self.cd_sys4x,     int(4*sys_clk_freq))
+        # pll.create_clkout(self.cd_sys4x_dqs, int(4*sys_clk_freq), phase=90)
+        # pll.create_clkout(self.cd_clk200,    int(200e6))
+        # pll.create_clkout(self.cd_eth,       int(25e6))
 
-        self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
+        # self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
 
         # Important, this ensures the system works properly
         platform.add_period_constraint(clk50, 20)
         platform.add_period_constraint(self.cd_sys.clk, float(1e9/sys_clk_freq))
-        platform.add_period_constraint(self.cd_sys2x.clk, float(1e9/(2*sys_clk_freq)))
-        platform.add_period_constraint(self.cd_sys4x.clk, float(1e9/(4*sys_clk_freq)))
-        platform.add_period_constraint(self.cd_sys4x_dqs.clk, float(1e9/(4*sys_clk_freq)))
-        platform.add_period_constraint(self.cd_clk200.clk, float(1e9/200e6))
-        platform.add_period_constraint(self.cd_eth.clk, float(1e9/25e6))
+        # platform.add_period_constraint(self.cd_sys2x.clk, float(1e9/(2*sys_clk_freq)))
+        # platform.add_period_constraint(self.cd_sys4x.clk, float(1e9/(4*sys_clk_freq)))
+        # platform.add_period_constraint(self.cd_sys4x_dqs.clk, float(1e9/(4*sys_clk_freq)))
+        # platform.add_period_constraint(self.cd_clk200.clk, float(1e9/200e6))
+        # platform.add_period_constraint(self.cd_eth.clk, float(1e9/25e6))
         platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk50_IBUF]")
 
 # BaseSoC ------------------------------------------------------------------------------------------
@@ -85,22 +85,22 @@ class BaseSoC(SoCCore):
         self.submodules.crg = _CRG(platform, sys_clk_freq)
 
         # DDR3 SDRAM -------------------------------------------------------------------------------
-        if not self.integrated_main_ram_size:
-            self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
-                memtype        = "DDR3",
-                nphases        = 4,
-                sys_clk_freq   = sys_clk_freq,
-                interface_type = "MEMORY")
-            self.add_csr("ddrphy")
-            self.add_sdram("sdram",
-                phy                     = self.ddrphy,
-                module                  = MT41K128M16(sys_clk_freq, "1:4"),
-                origin                  = self.mem_map["main_ram"],
-                size                    = kwargs.get("max_sdram_size", 0x40000000),
-                l2_cache_size           = kwargs.get("l2_size", 8192),
-                l2_cache_min_data_width = kwargs.get("min_l2_data_width", 128),
-                l2_cache_reverse        = True
-            )
+        # if not self.integrated_main_ram_size:
+            # self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
+                # memtype        = "DDR3",
+                # nphases        = 4,
+                # sys_clk_freq   = sys_clk_freq,
+                # interface_type = "MEMORY")
+            # self.add_csr("ddrphy")
+            # self.add_sdram("sdram",
+                # phy                     = self.ddrphy,
+                # module                  = MT41K128M16(sys_clk_freq, "1:4"),
+                # origin                  = self.mem_map["main_ram"],
+                # size                    = kwargs.get("max_sdram_size", 0x40000000),
+                # l2_cache_size           = kwargs.get("l2_size", 8192),
+                # l2_cache_min_data_width = kwargs.get("min_l2_data_width", 128),
+                # l2_cache_reverse        = True
+            # )
 
 # Build --------------------------------------------------------------------------------------------
 
