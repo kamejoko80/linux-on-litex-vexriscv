@@ -508,7 +508,7 @@ def main():
 
         # SoC peripherals --------------------------------------------------------------------------
         if "spiflash" in board.soc_capabilities:
-            soc.add_spi_flash(dummy_cycles=board.SPIFLASH_DUMMY_CYCLES)
+            soc.add_spi_flash(dummy_cycles=board.SPIFLASH_DUMMY_CYCLES, clk_freq=50e6)
             soc.add_constant("SPIFLASH_PAGE_SIZE", board.SPIFLASH_PAGE_SIZE)
             soc.add_constant("SPIFLASH_SECTOR_SIZE", board.SPIFLASH_SECTOR_SIZE)
         if "spisdcard" in board.soc_capabilities:
